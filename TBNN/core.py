@@ -1,9 +1,12 @@
 import numpy as np
+import time
+import torch
+import torch.nn as nn
+
+import _pickle as pickle
 import lasagne
 import theano.tensor as T
 import theano
-import time
-import _pickle as pickle
 
 """
 Copyright 2017 Sandia Corporation. Under the terms of Contract DE-AC04-94AL85000,
@@ -26,9 +29,8 @@ class NetworkStructure:
         self.num_nodes = 20  # Number of nodes per hidden layer
         self.num_inputs = None  # Number of scalar invariants
         self.num_tensor_basis = None  # Number of tensors in the tensor basis
-        self.nonlinearity = "LeakyRectify" # non-linearity string conforming to lasagne.nonlinearities tags
-        self.nonlinearity_keywords = {}
-        self.nonlinearity_keywords["leakiness"] = "0.1" # Leakiness of leaky ReLU activation functions
+        self.af = "ELU"  # non-linearity string conforming to torch.nn activation functions
+        self.af_keywords["alpha"] = "1.0"  # Keyword arguments of chosen activation functions
 
     def set_num_layers(self, num_layers):
         self.num_layers = num_layers
@@ -46,20 +48,20 @@ class NetworkStructure:
         self.num_tensor_basis = num_tensor_basis
         return self
 
-    def set_nonlinearity(self, nonlinearity):
-        self.nonlinearity = nonlinearity
+    def set_af(self, af):
+        self.af = af
         return self
 
-    def clear_nonlinearity_keywords(self):
-        self.nonlinearity_keywords = {}
+    def clear_af_keywords(self):
+        self.af_keywords = {}
 
-    def set_nonlinearity_keyword(self, key, value):
+    def set_af_keyword(self, key, value):
         if type(key) is not str:
             raise TypeError("NetworkStructure::set_nonlinearity_keywords - The keyword must be a string")
         # all values are stored as strings for later python eval
         if type(value) is not str:
             value = str(value)
-        self.nonlinearity_keywords[key] = value
+        self.af_keywords[key] = value
         return self
 
 
@@ -88,8 +90,8 @@ class TBNN:
     :param learning_rate_decay: the decay rate for the learning rate effecting convergence, must be between 0 and 1
     :param min_learning_rate: minimum learning rate floor the optimizer will not go below, must be greater than 0
     """
-    def __init__(self, structure=None, train_valid_split_fraction=0.9,
-                 print_freq=100, learning_rate_decay=1., min_learning_rate=1.e-6):
+    def __init__(self, structure=None, train_valid_split_fraction=0.9, print_freq=100, learning_rate_decay=1.,
+                 min_learning_rate=1.e-6):
         if structure is None:
             structure = NetworkStructure()
         self.structure = structure
@@ -183,7 +185,7 @@ class TBNN:
 
     def fit(self, scalar_basis, tensor_basis, labels, x_valid, tb_valid, y_valid, max_epochs=1000, min_epochs=0, init_learning_rate=0.01,
             interval=10, average_interval=10, loss=None, optimizer='dummy', weight_initialiser='dummy', batch_size=1,
-            output_file='dummy.txt', train_valid_random_split=False):
+            log='dummy.txt', train_valid_random_split=False):
         """
         Fit the Tensor Basis Neural Network to the data.  Note: Parts of this method is based on the Lasagne tutorial
         available at http://lasagne.readthedocs.io/en/latest/user/tutorial.html.
@@ -333,7 +335,7 @@ class TBNN:
         print("Final training rmse: ", np.sqrt(train_error))
         print("Final validation rmse: ", np.sqrt(val_error))
 
-        with open(output_file, "a") as write_file:
+        with open(log, "a") as write_file:
             print("Total number of epochs: ", epoch, file=write_file)
             print("Final training rmse: ", np.sqrt(train_error), file=write_file)
             print("Final validation rmse: ", np.sqrt(val_error), file=write_file)
