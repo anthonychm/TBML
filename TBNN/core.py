@@ -1,55 +1,58 @@
 import numpy as np
+import random
 import time
 import torch
 import torch.nn as nn
-
-import _pickle as pickle
-import lasagne
-import theano.tensor as T
-import theano
-
-"""
-Copyright 2017 Sandia Corporation. Under the terms of Contract DE-AC04-94AL85000,
-there is a non-exclusive license for use of this work by or on behalf of the U.S. Government.
-This software is distributed under the BSD-3-Clause license.
+import torch.utils.data as torchdata
+from calculator import PopeDataProcessor
 
 
-Please note that parts of the TBNN.fit() method were based on the Lasagne python package tutorial,
-available at http://lasagne.readthedocs.io/en/latest/user/tutorial.html, license available at
-https://github.com/Lasagne/Lasagne/blob/master/LICENSE.
-"""
+class DataLoader:
+    def __init__(self, seed, x_train, tb_train, y_train, x_valid, tb_valid, y_valid, x_test, tb_test, y_test,
+                 batch_size, device):
+
+        def seed_worker(seed):
+            torch_seed = torch.initial_seed()
+            np.random.seed(torch_seed + seed)
+            random.seed(torch_seed + seed)
+
+        g = torch.Generator(device=device)
+        g.manual_seed(seed)
+
+        train_dataset = torchdata.TensorDataset(x_train, tb_train, y_train)
+        valid_dataset = torchdata.TensorDataset(x_valid, tb_valid, y_valid)
+        test_dataset = torchdata.TensorDataset(x_test, tb_test, y_test)
+        self.train_loader = torchdata.DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
+                                                 worker_init_fn=seed_worker(seed), generator=g)
+        self.valid_loader = torchdata.DataLoader(valid_dataset, batch_size=batch_size, shuffle=False,
+                                                 worker_init_fn=seed_worker(seed), generator=g)
+        self.test_loader = torchdata.DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
+                                                worker_init_fn=seed_worker(seed), generator=g)
+
+    @staticmethod
+    def check_batch(loader):
+        dataiter = iter(loader)
+        print(next(dataiter))
 
 
 class NetworkStructure:
     """
     A class to define the layer structure for the neural network
     """
-    def __init__(self):
-        self.num_layers = 1  # Number of hidden layers
-        self.num_nodes = 20  # Number of nodes per hidden layer
-        self.num_inputs = None  # Number of scalar invariants
-        self.num_tensor_basis = None  # Number of tensors in the tensor basis
-        self.af = "ELU"  # non-linearity string conforming to torch.nn activation functions
+    def __init__(self, num_hid_layers, num_hid_nodes, af, num_inputs=None, num_tensor_basis=None):
+        self.num_hid_layers = num_hid_layers  # Number of hidden layers
+        self.num_hid_nodes = num_hid_nodes  # Number of nodes per hidden layer
+        self.af = af  # non-linearity string conforming to torch.nn activation functions
         self.af_keywords["alpha"] = "1.0"  # Keyword arguments of chosen activation functions
+        self.num_inputs = num_inputs  # Number of scalar invariants
+        self.num_tensor_basis = num_tensor_basis  # Number of tensors in the tensor basis
 
-    def set_num_layers(self, num_layers):
-        self.num_layers = num_layers
-        return self
-
-    def set_num_nodes(self, num_nodes):
-        self.num_nodes = num_nodes
-        return self
-
-    def set_num_inputs(self, num_inputs):
+    def set_num_inputs(self, num_inputs):  # Called in _check_structure and set to x.shape[-1]
         self.num_inputs = num_inputs
         return self
 
-    def set_num_tensor_basis(self, num_tensor_basis):
+    def set_num_tensor_basis(self, num_tensor_basis):  # Called in _check_structure and set to tb.shape[1]
         self.num_tensor_basis = num_tensor_basis
-        return self
-
-    def set_af(self, af):
-        self.af = af
         return self
 
     def clear_af_keywords(self):
@@ -57,103 +60,14 @@ class NetworkStructure:
 
     def set_af_keyword(self, key, value):
         if type(key) is not str:
-            raise TypeError("NetworkStructure::set_nonlinearity_keywords - The keyword must be a string")
+            raise TypeError("Activation function keyword must be a string")
         # all values are stored as strings for later python eval
         if type(value) is not str:
             value = str(value)
         self.af_keywords[key] = value
         return self
 
-
-class TensorLayer(lasagne.layers.MergeLayer):
-    """
-    Multiplicative tensor merge layer.
-    """
-    def __init__(self, incomings, **kwargs):
-        super(TensorLayer, self).__init__(incomings, **kwargs)
-
-    def get_output_shape_for(self, input_shapes):
-        output_shape = (None, 9)
-        return output_shape
-
-    def get_output_for(self, inputs, **kwargs):
-        output = T.batched_tensordot(inputs[0], inputs[1], axes=[[1], [1]])
-
-        return output
-
-
-class TBNN:
-    """
-    Defines Tensor Basis Neural Network (TBNN)
-    :param train_valid_split_fraction: the fraction of data used for training the NN vs. validation, must be between 0 and 1
-    :param print_freq: frequency with which diagnostic data will be printed to the screen, in epochs, must be > 0
-    :param learning_rate_decay: the decay rate for the learning rate effecting convergence, must be between 0 and 1
-    :param min_learning_rate: minimum learning rate floor the optimizer will not go below, must be greater than 0
-    """
-    def __init__(self, structure=None, train_valid_split_fraction=0.9, print_freq=100, learning_rate_decay=1.,
-                 min_learning_rate=1.e-6):
-        if structure is None:
-            structure = NetworkStructure()
-        self.structure = structure
-        self.network = None
-        self.train_valid_split_fraction = train_valid_split_fraction
-        self.print_freq = print_freq
-        self.learning_rate_decay = learning_rate_decay
-        self.min_learning_rate = min_learning_rate
-
-    def set_train_valid_split_fraction(self, train_valid_split_fraction):
-        self.train_valid_split_fraction = train_valid_split_fraction
-        return self
-
-    def set_print_freq(self, print_freq):
-        self.print_freq = print_freq
-        return self
-
-    def set_learning_rate_decay(self, learning_rate_decay):
-        self.learning_rate_decay = learning_rate_decay
-        return self
-
-    def set_min_learning_rate(self, min_learning_rate):
-        self.min_learning_rate = min_learning_rate
-        return self
-
-    def _build_NN(self, weight_initialiser):
-        """
-        Builds a TBNN with the number of hidden layers and hidden nodes specified in self.structure.
-        :param weight_initialiser: Weight initialising algorithm
-        :return:
-        """
-        # determine type of non-linearity first
-        nonlinearity_string = list("lasagne.nonlinearities."+self.structure.nonlinearity)
-        # check if upper to know if there are args and () or not
-        if self.structure.nonlinearity[0].isupper():
-            nonlinearity_string += list("(")
-            # add keyword options
-            for key in self.structure.nonlinearity_keywords:
-                nonlinearity_string += list(key+"="+self.structure.nonlinearity_keywords[key]+",")
-            if self.structure.nonlinearity_keywords:
-                nonlinearity_string[-1] = ")"
-            else:
-                nonlinearity_string += list(")")
-        nonlinearity = eval("".join(nonlinearity_string))
-        
-        input_x = T.dmatrix('input_x')
-        input_tb = T.dtensor3('input_tb')
-        input_layer = lasagne.layers.InputLayer(shape=(None, self.structure.num_inputs), input_var=input_x)
-        hidden_layer = lasagne.layers.DenseLayer(input_layer, num_units=self.structure.num_nodes,
-            nonlinearity=nonlinearity, W=eval(weight_initialiser))
-        for i in range(self.structure.num_layers - 1):
-            hidden_layer = lasagne.layers.DenseLayer(hidden_layer, num_units=self.structure.num_nodes,
-                nonlinearity=nonlinearity, W=eval(weight_initialiser))
-        linear_layer = lasagne.layers.DenseLayer(hidden_layer, num_units=self.structure.num_tensor_basis,
-            nonlinearity=None, W=eval(weight_initialiser))
-
-        tensor_layer = lasagne.layers.InputLayer(shape=(None, self.structure.num_tensor_basis, 9), input_var=input_tb)
-        merge_layer = TensorLayer([linear_layer, tensor_layer])
-        self.network = merge_layer
-        print('Building of NN complete')
-
-    def _check_structure(self, x, tb, y):
+    def check_structure(self, x, tb, y):
         """
         Define number of inputs and tensors in tensor basis and check that they're consistent with
         the specified structure
@@ -168,251 +82,228 @@ class TBNN:
 
         # Define number of inputs and tensors in tensor basis and check that they're consistent with
         # the specified structure
-        if self.structure.num_inputs is None:
-            self.structure.set_num_inputs(x.shape[-1])
+        if self.num_inputs is None:
+            self.set_num_inputs(x.shape[-1])
         else:
-            if self.structure.num_inputs != x.shape[-1]:
+            if self.num_inputs != x.shape[-1]:
                 print("Mis-matched shapes between specified number of inputs and number of features in input array")
                 raise Exception
 
-        if self.structure.num_tensor_basis is None:
-            self.structure.set_num_tensor_basis(tb.shape[1])
+        if self.num_tensor_basis is None:
+            self.set_num_tensor_basis(tb.shape[1])
         else:
-            if self.structure.num_tensor_basis != tb.shape[1]:
+            if self.num_tensor_basis != tb.shape[1]:
                 print("Mis-matched shapes between specified number of tensors in \
                  tensor basis and number of tensors in tb")
                 raise Exception
 
-    def fit(self, scalar_basis, tensor_basis, labels, x_valid, tb_valid, y_valid, max_epochs=1000, min_epochs=0, init_learning_rate=0.01,
-            interval=10, average_interval=10, loss=None, optimizer='dummy', weight_initialiser='dummy', batch_size=1,
-            log='dummy.txt', train_valid_random_split=False):
-        """
-        Fit the Tensor Basis Neural Network to the data.  Note: Parts of this method is based on the Lasagne tutorial
-        available at http://lasagne.readthedocs.io/en/latest/user/tutorial.html.
-        :param scalar_basis: Matrix of scalar basis features. Should be num_points X num_features numpy array
-        :param tensor_basis: Matrix of tensor basis. Should be num_points X num_tensor_basis X 9 numpy array
-        :param labels: Matrix of labels. Should by num_points X 9 numpy array
-        :param max_epochs: Maximum number of training epochs
-        :param min_epochs: Minimum number of training epochs
-        :param init_learning_rate: Initial learning rate to use
-        :param interval: Frequency at which convergence criteria are checked
-        :param average_interval: Number of intervals averaged over to determine if early stopping criteria should be triggered
-        :param loss: Loss function. If none specified, the default is a mean squared error loss function.
-        :param optimizer: Can specify which optimizer to use. Valid options include: "adam", "sgd", "rmsprop", "momentum"
-        :param weight_initialiser: Weight initialising algorithm
-        :param batch_size: Number of data samples to use per batch
-        :return:
-        """
-        # Build the neural network
-        self._check_structure(scalar_basis, tensor_basis, labels)
-        self._build_NN(weight_initialiser)
+        # Ensure length of hidden nodes vector is == number of hidden layers
+        assert len(self.num_hid_nodes) == self.num_hid_layers
 
-        optimizer_function = {
-            "adam": lasagne.updates.adam,
-            "adamax": lasagne.updates.adamax,
-            "amsgrad": lasagne.updates.amsgrad,
-            "rmsprop": lasagne.updates.rmsprop}[optimizer]
 
-        # Split training set into training and validation for early stopping, checked ✓
-        if train_valid_random_split is True:
-            num_points = scalar_basis.shape[0]
-            num_train = int(self.train_valid_split_fraction*num_points)
-            x_train = scalar_basis[:num_train, :]
-            tb_train = tensor_basis[:num_train, :, :]
-            y_train = labels[:num_train, :]
-            x_valid = scalar_basis[num_train:, :]
-            tb_valid = tensor_basis[num_train:, :, :]
-            y_valid = labels[num_train:, :]
-        else:
-            self._check_structure(x_valid, tb_valid, y_valid)
-            x_train = scalar_basis
-            tb_train = tensor_basis
-            y_train = labels
-            x_valid = x_valid
-            tb_valid = tb_valid
-            y_valid = y_valid
+class Tbnn(nn.Module):
+    def __init__(self, structure=None, seed=1, weight_init_name="dummy", weight_init_params="dummy"):
+        super(Tbnn, self).__init__()
+        if structure is None:
+            raise TypeError("Network structure not defined")
+        self.structure = structure
+        self.network = None
+        self.seed = seed
+        self.weight_init_name = weight_init_name
+        weight_init_params.split("=")
+        weight_init_params.split(", ")
+        self.weight_init_params = weight_init_params
 
-        # Specify the loss function and the training parameters
-        output_var = T.dmatrix('outputs')
-        input_x = lasagne.layers.get_all_layers(self.network)[0].input_var
-        input_tb = lasagne.layers.get_all_layers(self.network)[-2].input_var
-        prediction = lasagne.layers.get_output(self.network, deterministic=True)
-        if loss is None:
-            loss = lasagne.objectives.squared_error(prediction, output_var)
-            loss = lasagne.objectives.aggregate(loss, mode='mean')
-        valid_function = theano.function([input_x, input_tb, output_var], loss, on_unused_input='warn')
-        params = lasagne.layers.get_all_params(self.network, trainable=True)
-        learning_rate = theano.shared(np.array(init_learning_rate, dtype=theano.config.floatX))
-        learning_rate_decay = np.array(self.learning_rate_decay, dtype=theano.config.floatX)
-        min_learning_rate = np.array(np.minimum(self.min_learning_rate, init_learning_rate), dtype=theano.config.floatX)
-        updates = optimizer_function(loss, params, learning_rate=learning_rate)
-        train_function = theano.function([input_x, input_tb, output_var], loss, updates=updates, on_unused_input='warn')
-        print('train function specified')
+        # Create PyTorch network (try module.append if .add_module does not work)
+        self.net = nn.Sequential()
+        self.net.add_module("layer1", nn.Linear(self.structure.num_inputs, self.structure.num_hid_nodes[0]))
+        self.net.add_module("af1", getattr(nn, self.structure.af[0])(self.structure.af_keywords))
+        for layer in range(1, self.structure.num_hid_layers):
+            self.net.add_module("layer"+str(layer+1), nn.Linear(self.structure.num_hid_nodes[layer-1],
+                                                                self.structure.num_hid_nodes[layer]))
+            self.net.add_module("af" + str(layer+1), getattr(nn, self.structure.af[layer])(self.structure.af_keywords))
+        self.net.add_module("output_layer", nn.Linear(self.structure.num_hid_nodes[-1], self.structure.num_tensor_basis))
+        print("Building of NN complete")
 
-        epoch = 0
-        keep_going = True
-        batch_size = batch_size
-        error = np.zeros((1,))
+        # Create initialization arguments dictionary and initialize weights and biases
+        param_keys, param_val = [], []
+        for param in range(0, len(self.weight_init_params)-1):
+            param_keys = param_keys.append(weight_init_params[param*2])
+            param_val = param_val.append(weight_init_params[(param*2)+1])
+        weight_init_dict = dict(zip(param_keys, param_val))
 
-        def iterate_mini_batches(x1, x2, target, size, shuffle=False):
-            """
-            Select mini-batches
-            :param x1: scalar basis
-            :param x2: tensor basis
-            :param target: targets
-            :param size: size of batch
-            :param shuffle: whether or not to shuffle points
-            :return:
-            """
-            assert len(x1) == len(target)
-            indices = np.arange(len(x1))
-            if shuffle:
-                np.random.shuffle(indices)
-            for start_idx in range(0, len(x1) - size + 1, size):
-                if shuffle:
-                    excerpt = indices[start_idx:start_idx + size]
-                else:
-                    excerpt = slice(start_idx, start_idx + size)
-                yield x1[excerpt], x2[excerpt], target[excerpt]
+        def init_w_and_b(m):
+            torch.manual_seed(seed=seed)
+            if isinstance(m, nn.Linear):
+                init = getattr(nn.init, self.weight_init_name)
+                init(m.weight, **weight_init_dict)
+                m.bias.data.fill_(0.01)  # add bias fill as a frontend variable?
 
-        def check_convergence(error, max_epochs=max_epochs, min_epochs=min_epochs, interval=interval,
-                              average_interval=average_interval):
-            """
-            Check convergence criteria for early stopping and maximum number of epochs
-            :param error:
-            :param max_epochs: Maximum number of epochs to run (This over-rides min_epochs), default = 30000
-            :param min_epochs: Minimum number of epochs to run before stopping, default = 1000
-            :param interval: How often convergence is checked, default = 1
-            :param average_interval: default = 10
-            :return:
-            """
+        self.net.apply(init_w_and_b)
+        print("Weights and biases initialized")
 
-            # Calculate the true epoch number based on the interval and the number of entries in validation error array
-            epoch = (error.shape[0] - 2) * interval + 1
+    # Forward propagation
+    def forward(self, x, tb):
+        coeffs = self.net(x)
+        outputs = np.full((len(coeffs), 9), np.nan)
+        for bij_comp in range(0, 9):
+            outputs[:, bij_comp] = np.multiply(np.tile(coeffs, (10, 1)), tb[:, bij_comp])
+        return outputs
 
-            keep_going = True
-            if epoch > min_epochs:
-                # Implement an early stopping criterion to halt training if the validation error starts rising
-                keep_going = np.mean(error[-average_interval:]) < np.mean(error[-2*average_interval:-average_interval])
-            if epoch > max_epochs:
-                keep_going = False
-            return keep_going
-        
-        # Do stochastic gradient descent
-        print("Epoch time training_loss validation_loss")
-        while keep_going:
+
+class TbnnTVT:
+    def __init__(self, loss, optimizer, init_lr, lr_scheduler, lr_scheduler_params, min_epochs, max_epochs, interval, avg_interval, model, print_freq,
+                 log):
+        self.criterion = getattr(torch.nn, loss)()
+        self.optimizer = getattr(torch.optim, optimizer)(model.parameters(), lr=init_lr)
+        self.min_epochs = min_epochs
+        self.max_epochs = max_epochs
+        self.interval = interval
+        self.avg_interval = avg_interval
+        self.print_freq = print_freq
+        self.log = log
+
+        # Initialise learning rate scheduler
+        lr_scheduler_params.split("=")
+        lr_scheduler_params.split(", ")
+        param_keys, param_val = [], []
+        for param in range(0, len(lr_scheduler_params) - 1):
+            param_keys = param_keys.append(lr_scheduler_params[param * 2])
+            param_val = param_val.append(lr_scheduler_params[(param * 2) + 1])
+        lr_param_dict = dict(zip(param_keys, param_val))
+        self.lr_scheduler = getattr(torch.optim.lr_scheduler, lr_scheduler)(self.optimizer, **lr_param_dict)
+
+    def fit(self, device, train_loader, valid_loader, model):
+        epoch_count = 0
+        valid_loss_list = []
+        continue_train = True
+
+        # Training loop
+        print("Epoch    Time    Average training RMSE per batch    Average validation RMSE per batch")
+        while continue_train is True:
             start_time = time.time()
-            learning_rate.set_value(np.maximum(learning_rate.get_value()*learning_rate_decay, min_learning_rate))
+            epoch_count += 1
+            model.train()
+            epoch_count, avg_train_loss = self.train_one_epoch(train_loader, self.criterion, self.optimizer, device,
+                                                               model, epoch_count)
 
-            # In each epoch, we do a full pass over the training data:
-            train_error = 0
-            train_batches = 0
-            # Timer used to be here
-            for batch in iterate_mini_batches(x_train, tb_train, y_train, size=batch_size, shuffle=True):
-                inputs, input_tensors, targets = batch
-                train_error += train_function(inputs, input_tensors, targets)
-                train_batches += 1
+            # Predict on validation data for early stopping
+            if epoch_count % self.interval == 0:
+                avg_valid_loss = self.perform_valid(valid_loader, device, model, self.criterion)
+                valid_loss_list.append(avg_valid_loss)
+                continue_train = self.check_conv(valid_loss_list, self.min_epochs, self.avg_interval, epoch_count)
 
-            # Check for early stopping criteria
-            if epoch % interval == 0:
-                val_error = valid_function(x_valid, tb_valid, y_valid)
-                error = np.hstack((error, val_error))
-            keep_going = check_convergence(error, max_epochs=max_epochs, min_epochs=min_epochs, interval=interval, average_interval=average_interval)
+            # Ensure number of epochs is > min epochs and < max epochs
+            if epoch_count < self.min_epochs:
+                continue_train = True
 
-            # Then we print the results for this epoch:
-            if epoch % self.print_freq == 0:
-                train_error = valid_function(x_train, tb_train, y_train)
-#               print("Epoch {} took {:.3f}s".format(epoch + 1, time.time() - start_time))
-#               print("  rmse training loss:\t\t{:.6f}".format(np.sqrt(train_error)))
-#               print("  rmse validation loss:\t\t{:.6f}".format(np.sqrt(val_error)))
-                print("{0:6d} {1:7.4f} {2:12.8f} {3:12.8f}".format(
-                    epoch + 1, time.time() - start_time,
-                    np.sqrt(train_error),np.sqrt(val_error)))
+            if epoch_count > self.max_epochs:
+                continue_train = False
 
-            epoch += 1
+            # Print average training and validation RMSEs per batch in console
+            if epoch_count % self.print_freq == 0:
+                print(epoch_count, time.time() - start_time, np.sqrt(avg_train_loss), np.sqrt(avg_valid_loss))
 
-        print("Total number of epochs: ", epoch)
-        print("Final training rmse: ", np.sqrt(train_error))
-        print("Final validation rmse: ", np.sqrt(val_error))
+            # Update learning rate
+            self.lr_scheduler.step()
+
+        # Output final training and validation RMSEs per batch
+        final_train_rmse = np.sqrt(avg_train_loss)
+        final_valid_rmse = np.sqrt(avg_valid_loss)
+        self.post_train_print(self.log, epoch_count, final_train_rmse, final_valid_rmse)
+
+        return epoch_count, final_train_rmse, final_valid_rmse
+
+    def train_one_epoch(self, train_loader, criterion, optimizer, device, model, epoch_count):
+        running_train_loss = 0
+
+        for i, (x, tb, y) in enumerate(train_loader):
+            x, tb, y = self.to_device(x, tb, y, device)
+            optimizer.zero_grad()
+
+            # Forward propagation
+            outputs = model(x, tb)
+            loss = criterion(outputs, y)
+
+            # Backward propagation
+            loss.backward()
+            optimizer.step()
+
+            # Record loss
+            running_train_loss += loss.item()
+        avg_train_loss = running_train_loss / len(train_loader) # average loss per batch
+
+        return epoch_count, avg_train_loss
+
+    def perform_valid(self, valid_loader, device, model, criterion):
+        # Predict on validation data
+        running_valid_loss = 0
+        with torch.no_grad():
+            model.eval()
+            for i, (x, tb, y) in enumerate(valid_loader):
+                x, tb, y = self.to_device(x, tb, y, device)
+                valid_outputs = model(x, tb)
+                valid_loss = criterion(valid_outputs, y)
+                running_valid_loss += valid_loss
+
+        avg_valid_loss = running_valid_loss / len(valid_loader) # average loss per batch
+
+        return avg_valid_loss
+
+    def perform_test(self, device, enforce_realiz, num_realiz_its, log, test_loader, model):
+        # Predict on test data
+        with torch.no_grad():
+            model.eval()
+            for x, tb, y in test_loader:
+                x, tb, y = self.to_device(x, tb, y, device)
+                y_pred = model(x, tb)
+
+        # Enforce realizability
+        if enforce_realiz:
+            for i in range(num_realiz_its):
+                y_pred = PopeDataProcessor.make_realizable(y_pred)
+
+        # Calculate, print and write testing RMSE
+        test_rmse = self.test_rmse_ops(y_pred, y, log)
+
+        return y_pred, test_rmse
+
+    @staticmethod
+    def to_device(x, tb, y, device):
+        x = x.to(device)
+        tb = tb.to(device)
+        y = y.to(device)
+        return x, tb, y
+
+    @staticmethod
+    def check_conv(valid_loss_list, min_epochs, avg_interval, epoch_count):
+        if epoch_count > min_epochs:
+            # Activate early stopping if validation error starts increasing
+            continue_train = np.mean(valid_loss_list[-avg_interval:]) < \
+                             np.mean(valid_loss_list[-2*avg_interval:-avg_interval])
+
+            return continue_train
+
+    @staticmethod
+    def post_train_print(log, epoch_count, final_train_rmse, final_valid_rmse):
+        # Print training and validation RMSEs to console and write to file
+        print("Total number of epochs = ", epoch_count)
+        print("Final average training RMSE per batch = ", final_train_rmse)
+        print("Final average validation RMSE per batch = ", final_valid_rmse)
 
         with open(log, "a") as write_file:
-            print("Total number of epochs: ", epoch, file=write_file)
-            print("Final training rmse: ", np.sqrt(train_error), file=write_file)
-            print("Final validation rmse: ", np.sqrt(val_error), file=write_file)
+            print("Total number of epochs = ", epoch_count, file=write_file)
+            print("Final average training RMSE per batch = ", final_train_rmse, file=write_file)
+            print("Final average validation RMSE per batch = ", final_valid_rmse, file=write_file)
 
-        final_training_rmse = np.sqrt(train_error)
-        final_validation_rmse = np.sqrt(val_error)
+    @staticmethod
+    def test_rmse_ops(y_pred, y, log):
+        # Calculate testing RMSE, then print to console and write to file
+        assert y_pred.shape == y.shape, "shape mismatch"
+        test_rmse = np.sqrt(np.mean(np.square(y - y_pred)))
+        print("Testing RMSE per datapoint = ", test_rmse)
 
-        return final_training_rmse, final_validation_rmse
+        with open(log, "a") as write_file:
+            print("Testing RMSE per datapoint = ", test_rmse, file=write_file)
 
-    def predict(self, x, tb):
-        """
-        Make a prediction for a given set of input scalar invariants x and tensor basis tb
-        :param x: scalar basis
-        :param tb: tensor basis
-        """
-        input_x = lasagne.layers.get_all_layers(self.network)[0].input_var
-        input_tb = lasagne.layers.get_all_layers(self.network)[-2].input_var
-        prediction_function = theano.function([], lasagne.layers.get_output(self.network, deterministic=True),
-                                     givens={input_x: x, input_tb: tb}, on_unused_input='warn')
-        y_predicted = prediction_function()
-        return y_predicted
-
-    def predict_tensor_coefs(self, x, tb):
-        """
-        Make a prediction for a given set of input scalar invariants x and tensor basis tb
-        :param x: scalar basis
-        :param tb: tensor basis
-        """
-        input_x = lasagne.layers.get_all_layers(self.network)[0].input_var
-        prediction_function = theano.function([], lasagne.layers.get_output(lasagne.layers.get_all_layers(self.network)[-3], deterministic=True),
-                                     givens={input_x: x}, on_unused_input='warn')
-        y_predicted = prediction_function()
-        return y_predicted
-
-    def rmse_score(self, y_true, y_predicted):
-        """
-        Calculate root mean squared error (RMSE)
-        :param y_true: true value
-        :param y_predicted: predicted value
-        >>> tbnn = TBNN()
-        >>> print tbnn.rmse_score(np.array([1.0, 2.0, 3.0]), np.array([1.0, 5.0, -1.0]))
-        2.88675134595
-        """
-        assert y_true.shape == y_predicted.shape, "Shape mismatch"
-        rmse = np.sqrt(np.mean(np.square(y_true-y_predicted)))
-        return rmse
-
-    def contour_plot(self, x_coords, y_coords, f):
-        """
-        Make a contour plot
-        :param x_coords: x coordinates of points
-        :param y_coords: y coordinates of points
-        :param f: Function to use for coloring
-        :return:
-        """
-        import matplotlib.pyplot as plt
-        import matplotlib.tri as tri
-
-        fig = plt.figure()
-        fig.patch.set_facecolor('white')
-        ax = fig.gca()
-        ax.set_aspect('equal')
-        x_min = np.min(x_coords)
-        x_max = np.max(x_coords)
-        y_min = np.min(y_coords)
-        y_max = np.max(y_coords)
-
-        triangles = tri.Triangulation(x_coords, y_coords)
-        for i in range(9):
-            sub = plt.subplot(3, 3, i+1)
-            plt.tricontourf(triangles,  f[:, i], cmap='Spectral_r', extend='both')
-            plt.xlim([x_min, x_max])
-            plt.ylim([y_min, y_max])
-            plt.tick_params(axis='both', which='both', bottom='off', top='off', left='off', right='off',
-               labelbottom='off', labelleft='off')
-
-    def save(self, filename):
-        pickle.dump(self, open(filename, "wb"))
-
-
+        return test_rmse

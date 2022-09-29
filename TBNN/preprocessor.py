@@ -1,12 +1,34 @@
-import _pickle as pickle
 import random
 import numpy as np
 
-"""
-Copyright 2017 Sandia Corporation. Under the terms of Contract DE-AC04-94AL85000,
-there is a non-exclusive license for use of this work by or on behalf of the U.S. Government.
-This software is distributed under the BSD-3-Clause license.
-"""
+
+def load_data(database_name, n_skiprows):
+    """
+    Load CFD data for TBNN calculations.
+    :param database_name: Name of the data file containing the CFD data. The columns must be in the following order: TKE
+    from RANS, epsilon from RANS, velocity gradients from RANS and Reynolds stresses from high-fidelity simulation.
+    :param n_skiprows: Number of rows at top of data file which this code should skip for reading
+    :return: Variables k and eps from RANS, flattened grad_u tensor from RANS and flattened Reynolds stress tensor from
+    high-fidelity simulation.
+    """
+
+    # Load in F-BFS data
+    data = np.loadtxt(database_name, skiprows=n_skiprows)
+    k = data[:, 0]
+    eps = data[:, 1]
+    grad_u_flat = data[:, 2:11]
+    stresses_flat = data[:, 11:]
+
+    # Reshape grad_u and stresses to num_points X 3 X 3 arrays
+    num_points = data.shape[0]
+    grad_u = np.zeros((num_points, 3, 3))
+    stresses = np.zeros((num_points, 3, 3))
+    for i in range(3):
+        for j in range(3):
+            grad_u[:, i, j] = grad_u_flat[:, i*3+j]
+            stresses[:, i, j] = stresses_flat[:, i*3+j]
+
+    return k, eps, grad_u, stresses
 
 
 class DataProcessor:
@@ -17,90 +39,80 @@ class DataProcessor:
         self.mu = None
         self.std = None
 
-    def calc_scalar_basis(self, input_tensors, is_train=False, *args, **kwargs):
+    def calc_scalar_basis(self, Sij, Rij, is_train=False, *args, **kwargs):
         if is_train is True or self.mu is None or self.std is None:
             print("Re-setting normalization constants")
 
-    def calc_tensor_basis(self, input_tensors, *args, **kwargs):
+    @staticmethod
+    def calc_tensor_basis(Sij, Rij, *args, **kwargs):
         pass
 
-    def calc_output(self, outputs, *args, **kwargs):
-        return outputs
+    @staticmethod
+    def calc_output(tauij):
+        return tauij
 
     @staticmethod
-    def train_test_split(inputs, tb, outputs, fraction=0.8, randomize=True, seed=None):
+    def random_split(inputs, tb, outputs, fraction=0.8, shuffle=True, seed=None):
         """
         Randomly splits CFD data into training and test set
         :param inputs: scalar invariants
         :param tb: tensor basis
         :param outputs: Reynolds stress anisotropy
         :param fraction: fraction of all CFD data to use for training data
-        :param randomize: if True, randomly shuffles data along first axis before splitting it
+        :param shuffle: if True, randomly shuffles data along first axis before splitting it
         :param seed: Random seed for reproducible train-test splitting
         :return: inputs, tb and outputs for the training and test sets
         """
         num_points = inputs.shape[0]
-        assert 0 <= fraction <= 1, "fraction must be a real number between 0 and 1"
+        assert 0 <= fraction <= 1, "Fraction must be a real number between 0 and 1"
         num_train = int(fraction*num_points)
         idx = list(range(num_points))
-        if randomize:
-            if seed:
-                random.seed(seed)
-            random.shuffle(idx)
+        DataProcessor.shuffle_idx(seed, idx, shuffle)
         train_idx = idx[:num_train]
         test_idx = idx[num_train:]
-        print('random train_test_split complete')
+
         return inputs[train_idx, :], tb[train_idx, :, :], outputs[train_idx, :], \
                inputs[test_idx, :], tb[test_idx, :, :], outputs[test_idx, :]
 
     @staticmethod
-    def train_test_specified(inputs, tb, outputs, train_list, test_list, train_valid_random_split, valid_list, n_case_points):
+    def specified_split(inputs, tensor_basis, outputs, case_list, n_case_points, case_dict, num_tensor_basis, seed,
+                        shuffle=True):
         """
         Splits the x, tb and y arrays into train and test sets using the specified train and test cases
         :param inputs: scalar invariants
-        :param tb: tensor basis
+        :param tensor_basis: tensor basis
         :param outputs: Reynolds stress anisotropy
-        :param train_list: list of cases for training
-        :param test_list: list of cases for testing
+        :param case_list: list of cases for extraction
         :param n_case_points: Number of data points per CFD case
+        :param case_dict: dictionary for extracting case index
         :return: inputs, tb and outputs for the training and test sets
         """
 
-        case_dict = {1: 1, 2: 2, 4: 3}
-        x_train = np.empty((0, 5))
-        tb_train = np.empty((0, 10, 9))
-        y_train = np.empty((0, 9))
-        x_test = np.empty((0, 5))
-        tb_test = np.empty((0, 10, 9))
-        y_test = np.empty((0, 9))
+        # Initialise x, tb and y arrays
+        x = np.empty((0, 5))
+        tb = np.empty((0, num_tensor_basis, 9))
+        y = np.empty((0, 9))
 
-        for case in train_list:
+        # Loop through cases in list to extract x, tb and y
+        for case in case_list:
             extract_rows = list(range(0, case_dict[case]*n_case_points))
-            x_train = np.concatenate((x_train, inputs[extract_rows[-n_case_points:], :]), axis = 0)
-            tb_train = np.concatenate((tb_train, tb[extract_rows[-n_case_points:], :, :]), axis = 0)
-            y_train = np.concatenate((y_train, outputs[extract_rows[-n_case_points:], :]), axis = 0)
+            x = np.concatenate((x, inputs[extract_rows[-n_case_points:], :]), axis=0)
+            tb = np.concatenate((tb, tensor_basis[extract_rows[-n_case_points:], :, :]), axis=0)
+            y = np.concatenate((y, outputs[extract_rows[-n_case_points:], :]), axis=0)
 
-        for case in test_list:
-            extract_rows = list(range(0, case_dict[case]*n_case_points))
-            x_test = np.concatenate((x_test, inputs[extract_rows[-n_case_points:], :]), axis = 0)
-            tb_test = np.concatenate((tb_test, tb[extract_rows[-n_case_points:], :, :]), axis = 0)
-            y_test = np.concatenate((y_test, outputs[extract_rows[-n_case_points:], :]), axis = 0)
+        num_points = x.shape[0]
+        assert x.shape[0] == tb.shape[0] == y.shape[0], "Mismatch in number of data points"
+        idx = list(range(num_points))
+        DataProcessor.shuffle_idx(seed, idx, shuffle)
 
-        x_valid, tb_valid, y_valid = [], [], []
+        return x[idx, :], tb[idx, :, :], y[idx, :]
 
-        if train_valid_random_split is False:
-            x_valid = np.empty((0, 5))
-            tb_valid = np.empty((0, 10, 9))
-            y_valid = np.empty((0, 9))
+    @staticmethod
+    def shuffle_idx(seed, idx, shuffle=True):
+        if shuffle:
+            if seed:
+                random.seed(seed)
+            random.shuffle(idx)
 
-            for case in valid_list:
-                extract_rows = list(range(0, case_dict[case] * n_case_points))
-                x_valid = np.concatenate((x_valid, inputs[extract_rows[-n_case_points:], :]), axis=0)
-                tb_valid = np.concatenate((tb_valid, tb[extract_rows[-n_case_points:], :, :]), axis=0)
-                y_valid = np.concatenate((y_valid, outputs[extract_rows[-n_case_points:], :]), axis=0)
+        return idx
 
-        print('specified train_test_split complete')
-        return x_train, tb_train, y_train, x_test, tb_test, y_test, x_valid, tb_valid, y_valid
-
-    def save(self, filename):
-        pickle.dump(self, open(filename, "wb"))

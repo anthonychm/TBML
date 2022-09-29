@@ -1,15 +1,8 @@
 import numpy as np
 from preprocessor import DataProcessor
-# tbnn is now called core.py but DataProcessor is located in preprocessor.py
-
-"""
-Copyright 2017 Sandia Corporation. Under the terms of Contract DE-AC04-94AL85000,
-there is a non-exclusive license for use of this work by or on behalf of the U.S. Government.
-This software is distributed under the BSD-3-Clause license.
-"""
 
 
-class TurbulenceKEpsDataProcessor(DataProcessor):
+class PopeDataProcessor(DataProcessor):
     """
     Inherits from DataProcessor class.  This class is specific to processing turbulence data to predict
     the anisotropy tensor based on the mean strain rate (Sij) and mean rotation rate (Rij) tensors
@@ -62,14 +55,14 @@ class TurbulenceKEpsDataProcessor(DataProcessor):
         >>> A[0, :, :] = np.eye(3) * 2.0
         >>> B[0, 1, 0] = 1.0
         >>> B[0, 0, 1] = -1.0
-        >>> tdp = TurbulenceKEpsDataProcessor()
+        >>> tdp = PopeDataProcessor()
         >>> tdp.mu = 0
         >>> tdp.std = 0
         >>> scalar_basis = tdp.calc_scalar_basis(A, B, is_scale=False)
         >>> print scalar_basis
         [[ 12.  -2.  24.  -4.  -8.]]
         """
-        DataProcessor.calc_scalar_basis(self, Sij, is_train=is_train)
+        DataProcessor.calc_scalar_basis(self, Sij, Rij, is_train=is_train)
         num_points = Sij.shape[0]
         num_invariants = 5
         invariants = np.zeros((num_points, num_invariants))
@@ -101,67 +94,80 @@ class TurbulenceKEpsDataProcessor(DataProcessor):
             invariants = (invariants - self.mu[:, 1]) / self.std[:, 1]  # Renormalize a second time after capping
         return invariants
 
-    def calc_tensor_basis(self, Sij, Rij, quadratic_only=False, is_scale=True):
+    @staticmethod
+    def calc_tensor_basis(Sij, Rij, num_tensor_basis=10, is_scale=True):
         """
         Given Sij and Rij, it calculates the tensor basis
         :param Sij: normalized strain rate tensor
         :param Rij: normalized rotation rate tensor
-        :param quadratic_only: True if only linear and quadratic terms are desired.  False if full basis is desired.
+        :param num_tensor_basis: number of tensor bases to predict
         :return: T_flat: num_points X num_tensor_basis X 9 numpy array of tensor basis.
                         Ordering is 11, 12, 13, 21, 22, ...
-        >>> A = np.zeros((1, 3, 3))
-        >>> B = np.zeros((1, 3, 3))
-        >>> A[0, :, :] = np.eye(3)
-        >>> B[0, 1, 0] = 3.0
-        >>> B[0, 0, 1] = -3.0
-        >>> tdp = TurbulenceKEpsDataProcessor()
-        >>> tb = tdp.calc_tensor_basis(A, B, is_scale=False)
-        >>> print tb[0, :, :]
-        [[  0.   0.   0.   0.   0.   0.   0.   0.   0.]
-         [  0.   0.   0.   0.   0.   0.   0.   0.   0.]
-         [  0.   0.   0.   0.   0.   0.   0.   0.   0.]
-         [ -3.   0.   0.   0.  -3.   0.   0.   0.   6.]
-         [  0.   0.   0.   0.   0.   0.   0.   0.   0.]
-         [ -6.   0.   0.   0.  -6.   0.   0.   0.  12.]
-         [  0.   0.   0.   0.   0.   0.   0.   0.   0.]
-         [  0.   0.   0.   0.   0.   0.   0.   0.   0.]
-         [ -6.   0.   0.   0.  -6.   0.   0.   0.  12.]
-         [  0.   0.   0.   0.   0.   0.   0.   0.   0.]]
         """
         num_points = Sij.shape[0]
-        if not quadratic_only:
-            num_tensor_basis = 10
-        else:
-            num_tensor_basis = 4
         T = np.zeros((num_points, num_tensor_basis, 3, 3))
+
+        # Insert tensor basis functions into a dictionary
+        def t1(T, i, sij):
+            T[i, 0, :, :] = sij
+            return T
+
+        def t2(T, i, sij, rij):
+            T[i, 1, :, :] = np.dot(sij, rij) - np.dot(rij, sij)
+            return T
+
+        def t3(T, i, sij):
+            T[i, 2, :, :] = np.dot(sij, sij) - 1. / 3. * np.eye(3) * np.trace(np.dot(sij, sij))
+            return T
+
+        def t4(T, i, rij):
+            T[i, 3, :, :] = np.dot(rij, rij) - 1. / 3. * np.eye(3) * np.trace(np.dot(rij, rij))
+            return T
+
+        def t5(T, i, sij, rij):
+            T[i, 4, :, :] = np.dot(rij, np.dot(sij, sij)) - np.dot(np.dot(sij, sij), rij)
+            return T
+
+        def t6(T, i, sij, rij):
+            T[i, 5, :, :] = np.dot(rij, np.dot(rij, sij)) + np.dot(sij, np.dot(rij, rij)) \
+                            - 2. / 3. * np.eye(3) * np.trace(np.dot(sij, np.dot(rij, rij)))
+            return T
+
+        def t7(T, i, sij, rij):
+            T[i, 6, :, :] = np.dot(np.dot(rij, sij), np.dot(rij, rij)) - np.dot(np.dot(rij, rij), np.dot(sij, rij))
+            return T
+
+        def t8(T, i, sij, rij):
+            T[i, 7, :, :] = np.dot(np.dot(sij, rij), np.dot(sij, sij)) - np.dot(np.dot(sij, sij), np.dot(rij, sij))
+            return T
+
+        def t9(T, i, sij, rij):
+            T[i, 8, :, :] = np.dot(np.dot(rij, rij), np.dot(sij, sij)) + np.dot(np.dot(sij, sij), np.dot(rij, rij)) \
+                            - 2. / 3. * np.eye(3) * np.trace(np.dot(np.dot(sij, sij), np.dot(rij, rij)))
+            return T
+
+        def t10(T, i, sij, rij):
+            T[i, 9, :, :] = np.dot(np.dot(rij, np.dot(sij, sij)), np.dot(rij, rij)) \
+                            - np.dot(np.dot(rij, np.dot(rij, sij)), np.dot(sij, rij))
+            return T
+
+        tensor_basis_dict = {}
+        for j, t in enumerate([t1, t2, t3, t4, t5, t6, t7, t8, t9, t10]):
+            tensor_basis_dict[j] = t
+
         for i in range(num_points):
             sij = Sij[i, :, :]
             rij = Rij[i, :, :]
-            T[i, 0, :, :] = sij
-            T[i, 1, :, :] = np.dot(sij, rij) - np.dot(rij, sij)
-            T[i, 2, :, :] = np.dot(sij, sij) - 1./3.*np.eye(3)*np.trace(np.dot(sij, sij))
-            T[i, 3, :, :] = np.dot(rij, rij) - 1./3.*np.eye(3)*np.trace(np.dot(rij, rij))
-            if not quadratic_only:
-                T[i, 4, :, :] = np.dot(rij, np.dot(sij, sij)) - np.dot(np.dot(sij, sij), rij)
-                T[i, 5, :, :] = np.dot(rij, np.dot(rij, sij)) \
-                                + np.dot(sij, np.dot(rij, rij)) \
-                                - 2./3.*np.eye(3)*np.trace(np.dot(sij, np.dot(rij, rij)))
-                T[i, 6, :, :] = np.dot(np.dot(rij, sij), np.dot(rij, rij)) - np.dot(np.dot(rij, rij), np.dot(sij, rij))
-                T[i, 7, :, :] = np.dot(np.dot(sij, rij), np.dot(sij, sij)) - np.dot(np.dot(sij, sij), np.dot(rij, sij))
-                T[i, 8, :, :] = np.dot(np.dot(rij, rij), np.dot(sij, sij)) \
-                                + np.dot(np.dot(sij, sij), np.dot(rij, rij)) \
-                                - 2./3.*np.eye(3)*np.trace(np.dot(np.dot(sij, sij), np.dot(rij, rij)))
-                T[i, 9, :, :] = np.dot(np.dot(rij, np.dot(sij, sij)), np.dot(rij, rij)) \
-                                - np.dot(np.dot(rij, np.dot(rij, sij)), np.dot(sij, rij))
-            # Enforce zero trace for anisotropy
             for j in range(num_tensor_basis):
+                T = tensor_basis_dict[j](T, i, sij=sij, rij=rij)
+                # Enforce zero trace for anisotropy
                 T[i, j, :, :] = T[i, j, :, :] - 1./3.*np.eye(3)*np.trace(T[i, j, :, :])
 
         # Scale down to promote convergence
         if is_scale:
             scale_factor = [10, 100, 100, 100, 1000, 1000, 10000, 10000, 10000, 10000]
-            for i in range(num_tensor_basis):
-                T[:, i, :, :] /= scale_factor[i]
+            for j in range(num_tensor_basis):
+                T[:, j, :, :] /= scale_factor[j]
 
         # Flatten:
         T_flat = np.zeros((num_points, num_tensor_basis, 9))
@@ -170,26 +176,27 @@ class TurbulenceKEpsDataProcessor(DataProcessor):
                 T_flat[:, :, 3*i+j] = T[:, :, i, j]
         return T_flat
 
-    def calc_output(self, stresses):
+    @staticmethod
+    def calc_output(tauij):
         """
         Given Reynolds stress tensor (num_points X 3 X 3), return flattened non-dimensional anisotropy tensor
-        :param stresses: Reynolds stress tensor
-        :return: anisotropy_flat: (num_points X 9) anisotropy tensor.  aij = (uiuj)/2k - 1./3. * delta_ij
+        :param tauij: Reynolds stress tensor
+        :return: anisotropy_flat: (num_points X 9) anisotropy tensor.  bij = (uiuj)/2k - 1./3. * delta_ij
         """
-        num_points = stresses.shape[0]
-        anisotropy = np.zeros((num_points, 3, 3))
+        num_points = tauij.shape[0]
+        bij = np.zeros((num_points, 3, 3))
 
         for i in range(3):
             for j in range(3):
-                tke = 0.5 * (stresses[:, 0, 0] + stresses[:, 1, 1] + stresses[:, 2, 2])
+                tke = 0.5 * (tauij[:, 0, 0] + tauij[:, 1, 1] + tauij[:, 2, 2])
                 tke = np.maximum(tke, 1e-8)
-                anisotropy[:, i, j] = stresses[:, i, j]/(2.0 * tke)
-            anisotropy[:, i, i] -= 1./3.
-        anisotropy_flat = np.zeros((num_points, 9))
+                bij[:, i, j] = tauij[:, i, j]/(2.0 * tke)
+            bij[:, i, i] -= 1./3.
+        bij_flat = np.zeros((num_points, 9))
         for i in range(3):
             for j in range(3):
-                anisotropy_flat[:, 3*i+j] = anisotropy[:, i, j]
-        return anisotropy_flat
+                bij_flat[:, 3*i+j] = bij[:, i, j]
+        return bij_flat
 
     @staticmethod
     def calc_rans_anisotropy(grad_u, tke, eps):
@@ -201,20 +208,20 @@ class TurbulenceKEpsDataProcessor(DataProcessor):
         :param eps: turbulent dissipation rate
         :return: rans_anisotropy
         """
-        sij, _ = TurbulenceKEpsDataProcessor.calc_Sij_Rij(grad_u, tke, eps, cap=np.infty)
+        sij, _ = PopeDataProcessor.calc_Sij_Rij(grad_u, tke, eps, cap=np.infty)
         c_mu = 0.09
 
         # Calculate anisotropy tensor (num_points X 3 X 3)
         # Note: Sij is already non-dimensionalized with tke/eps
-        rans_anisotropy_matrix = - c_mu * sij
+        rans_bij_matrix = - c_mu * sij
 
         # Flatten into num_points X 9 array
         num_points = sij.shape[0]
-        rans_anisotropy = np.zeros((num_points, 9))
+        rans_bij = np.zeros((num_points, 9))
         for i in range(3):
             for j in range(3):
-                rans_anisotropy[:, i*3+j] = rans_anisotropy_matrix[:, i, j]
-        return rans_anisotropy
+                rans_bij[:, i*3+j] = rans_bij_matrix[:, i, j]
+        return rans_bij
 
     @staticmethod
     def make_realizable(labels):
