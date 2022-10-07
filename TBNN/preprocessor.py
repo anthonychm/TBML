@@ -12,7 +12,7 @@ def load_data(database_name, n_skiprows):
     high-fidelity simulation.
     """
 
-    # Load in F-BFS data
+    # Load in database and separate data
     data = np.loadtxt(database_name, skiprows=n_skiprows)
     k = data[:, 0]
     eps = data[:, 1]

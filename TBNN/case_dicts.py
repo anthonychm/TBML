@@ -1,6 +1,6 @@
 def case_dict_names():
     database2case = {
-        "Channel_full_set_no_walls.txt": channel_flow_7(),
+        "full_set_no_walls.txt": channel_flow_7(),
         "FBFS_full_set_no_walls.txt": fbfs_3(),
         "FBFS_full_set_no_walls_5.txt": fbfs_5()
     }

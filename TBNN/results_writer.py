@@ -1,6 +1,30 @@
 import numpy as np
 import os.path
 import pandas as pd
+from pathlib import Path
+
+
+def create_parent_folders():
+
+    # Create TBNN output data folder if it does not exist
+    folder_path = os.path.join(os.getcwd(), "TBNN output data")
+    path = Path(folder_path)
+    if path.is_dir():
+        pass
+    else:
+        os.mkdir(folder_path)
+
+    # Create Results and Trials folders if they do not exist
+    results_path = os.path.join(folder_path, "Results")
+    trials_path = os.path.join(folder_path, "Trials")
+    for path in [results_path, trials_path]:
+        path_instance = Path(path)
+        if path_instance.is_dir():
+            pass
+        else:
+            os.mkdir(path)
+
+    return folder_path
 
 
 def write_bij_results(folder_path, seed, predicted_bij, current_folder):
@@ -90,34 +114,49 @@ def errors_list_init():
 
 def write_param_txt(current_folder, folder_path, user_vars):
     # Write individual parameters.txt file in each trial folder
-    var_incl_list = ["avg_interval", "batch_size", "enforce_realiz", "init_lr", "interval", "lr_decay", "loss",
-                     "max_epochs", "min_epochs", "min_lr", "af", "af_key", "af_key_value", "num_layers", "num_nodes",
-                     "num_realiz_its", "optimizer", "test_list", "train_list", "train_test_rand_split",
-                     "train_test_split_frac", "train_valid_rand_split", "train_valid_split_frac", "trial",
-                     "valid_list", "weight_init_name", "weight_init_params"]
-    trial = current_folder
+    var_name_list = ["trial", "num_hid_layers", "num_hid_nodes", "num_tensor_basis", "max_epochs", "min_epochs", "interval",
+                     "avg_interval", "enforce_realiz", "num_realiz_its", "af", "af_params",
+                     "weight_init", "weight_init_params", "init_lr", "lr_scheduler", "lr_scheduler_params",
+                     "loss", "optimizer", "batch_size", "train_test_rand_split", "train_test_split_frac",
+                     "train_valid_rand_split", "train_valid_split_frac", "train_list", "valid_list", "test_list"]
+
     with open(os.path.join(folder_path, 'Trials', 'Trial ' + str(current_folder), 'Trial' + str(current_folder) +
                                                                                   '_parameters.txt'), "a") as vars_file:
-        for var_name in var_incl_list:
+        for var_name in var_name_list:
             if var_name == "trial":
-                vars_file.write(str(var_name) + " " + str(eval(var_name)) + "\n")
-            vars_file.write(str(var_name) + " " + str(eval(user_vars[var_name])) + "\n")
+                vars_file.write(str(var_name) + " " + str(current_folder) + "\n")
+            else:
+                vars_file.write(str(var_name) + " " + str(user_vars[var_name]) + "\n")
 
 
 def write_param_csv(current_folder, folder_path, user_vars):
-    # Write new row in parameters and means database
-    var_incl_list = ["avg_interval", "batch_size", "enforce_realiz", "init_lr", "interval", "lr_decay", "loss",
-                     "max_epochs", "min_epochs", "min_lr", "af", "af_key", "af_key_value", "num_layers", "num_nodes",
-                     "num_realiz_its", "optimizer", "test_list", "train_list", "train_test_rand_split",
-                     "train_test_split_frac", "train_valid_rand_split", "train_valid_split_frac", "trial",
-                     "valid_list", "weight_init_name", "weight_init_params"]
-    trial = current_folder
-    main_params_df = pd.read_csv(os.path.join(folder_path, 'Results', 'Trial_parameters_and_means.csv'))
-    for var_name in var_incl_list:
+    # Write new row in Trial_parameters_and_means.csv file
+    var_name_list = ["trial", "num_hid_layers", "num_hid_nodes", "num_tensor_basis", "max_epochs", "min_epochs", "interval",
+                     "avg_interval", "enforce_realiz", "num_realiz_its", "af", "af_params",
+                     "weight_init", "weight_init_params", "init_lr", "lr_scheduler", "lr_scheduler_params",
+                     "loss", "optimizer", "batch_size", "train_test_rand_split", "train_test_split_frac",
+                     "train_valid_rand_split", "train_valid_split_frac", "train_list", "valid_list", "test_list"]
+    mean_name_list = ["Mean_final_training_rmse", "Mean_final_validation_rmse", "Mean_testing_rmse"]
+    all_name_list = var_name_list + mean_name_list
+
+    # Check if Trial_parameters_and_means.csv file exists
+    file_path = os.path.join(folder_path, "Results", "Trial_parameters_and_means.csv")
+    path = Path(file_path)
+    if path.is_file():
+        pass
+    else:
+        # Create Trial_parameters_and_means.csv file
+        main_params_df = pd.DataFrame(columns=all_name_list)
+        main_params_df.to_csv(file_path, sep=",", index=False)
+
+    # Read the csv file and add a new row of parameter values for current trial
+    main_params_df = pd.read_csv(file_path)
+    for var_name in var_name_list:
         if var_name == "trial":
-            main_params_df.loc[current_folder, var_name] = str(eval(var_name))
-        main_params_df.loc[current_folder, var_name] = str(eval(user_vars[var_name]))
-    main_params_df.to_csv(os.path.join(folder_path, 'Results', 'Trial_parameters_and_means.csv'), index=False)
+            main_params_df.loc[current_folder, var_name] = str(current_folder)
+        else:
+            main_params_df.loc[current_folder, var_name] = str(user_vars[var_name])
+    main_params_df.to_csv(file_path, index=False)
 
 
 def write_error_means_csv(final_train_rmse_list, final_valid_rmse_list, test_rmse_list, folder_path, current_folder):

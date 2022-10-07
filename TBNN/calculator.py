@@ -41,6 +41,9 @@ class PopeDataProcessor(DataProcessor):
         return Sij, Rij
 
     def calc_scalar_basis(self, Sij, Rij, is_train=False, cap=2.0, is_scale=True):
+
+        # to do: Check this
+
         """
         Given the non-dimensionalized mean strain rate and mean rotation rate tensors Sij and Rij,
         this returns a set of normalized scalar invariants
@@ -108,7 +111,7 @@ class PopeDataProcessor(DataProcessor):
         T = np.zeros((num_points, num_tensor_basis, 3, 3))
 
         # Insert tensor basis functions into a dictionary
-        def t1(T, i, sij):
+        def t1(T, i, sij, rij):
             T[i, 0, :, :] = sij
             return T
 
@@ -116,11 +119,11 @@ class PopeDataProcessor(DataProcessor):
             T[i, 1, :, :] = np.dot(sij, rij) - np.dot(rij, sij)
             return T
 
-        def t3(T, i, sij):
+        def t3(T, i, sij, rij):
             T[i, 2, :, :] = np.dot(sij, sij) - 1. / 3. * np.eye(3) * np.trace(np.dot(sij, sij))
             return T
 
-        def t4(T, i, rij):
+        def t4(T, i, sij, rij):
             T[i, 3, :, :] = np.dot(rij, rij) - 1. / 3. * np.eye(3) * np.trace(np.dot(rij, rij))
             return T
 

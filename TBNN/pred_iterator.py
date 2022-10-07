@@ -4,6 +4,8 @@ from results_writer import write_bij_results, init_log, errors_list_init, write_
 from calculator import PopeDataProcessor
 import case_dicts
 import torch
+import numpy as np
+import random
 from core import NetworkStructure, Tbnn, DataLoader, TbnnTVT
 
 
@@ -22,14 +24,16 @@ def preprocessing(enforce_realiz, num_realiz_its, database_name, n_skiprows, num
     :param n_skiprows: Number of rows at top of data file which this code should skip for reading
     :return: invariants x, tensor basis tb and Reynolds stress anisotropy y, for all of the CFD data
     """
+
     # Load in data
     k, eps, grad_u, stresses = load_data(database_name=database_name, n_skiprows=n_skiprows)
     print("Data loading complete")
 
     # Calculate inputs and outputs
     data_processor = PopeDataProcessor()
-    Sij, Rij = data_processor.calc_Sij_Rij(grad_u, k, eps)  # Mean strain rate tensor k/eps*Sij, mean rotation rate tensor k/eps*Rij
-    x = data_processor.calc_scalar_basis(Sij, Rij, is_train=True)  # Scalar basis
+    Sij, Rij = data_processor.calc_Sij_Rij(grad_u, k, eps)  # Mean strain rate tensor k/eps*Sij,
+                                                            # mean rotation rate tensor k/eps*Rij
+    x = data_processor.calc_scalar_basis(Sij, Rij, is_train=True)  # Scalar basis # to do: Check this
     tb = data_processor.calc_tensor_basis(Sij, Rij, num_tensor_basis)  # Tensor basis
     y = data_processor.calc_output(stresses)  # Anisotropy tensor
     print("x, tb and y calculations complete")
@@ -43,7 +47,16 @@ def preprocessing(enforce_realiz, num_realiz_its, database_name, n_skiprows, num
     return x, tb, y
 
 
-def split_database(x, tb, y, seed, train_list, test_list, valid_list, train_valid_rand_split, train_test_rand_split,
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    return
+
+
+def split_database(x, tb, y, train_list, valid_list, test_list, seed, train_valid_rand_split, train_test_rand_split,
                    train_valid_split_frac, train_test_split_frac, num_tensor_basis, database_name):
     """
     Split the data using your chosen data-splitting method
@@ -75,8 +88,7 @@ def split_database(x, tb, y, seed, train_list, test_list, valid_list, train_vali
     # Else split database according to specified cases if random split = False
     else:
         db2case = case_dicts.case_dict_names()
-        case_dict_call = getattr(case_dicts, db2case[database_name])
-        case_dict, n_case_points = case_dict_call()
+        case_dict, n_case_points = db2case[database_name]
         x_train, tb_train, y_train = PopeDataProcessor.specified_split(x, tb, y, train_list, n_case_points, case_dict, num_tensor_basis, seed)
         print("Specified data split for training complete")
         x_test, tb_test, y_test = PopeDataProcessor.specified_split(x, tb, y, test_list, n_case_points, case_dict, num_tensor_basis, seed)
@@ -91,18 +103,32 @@ def split_database(x, tb, y, seed, train_list, test_list, valid_list, train_vali
     return x_train, tb_train, y_train, x_test, tb_test, y_test, x_valid, tb_valid, y_valid
 
 
-def tbnn_ops(x_train, tb_train, y_train, x_valid, tb_valid, y_valid, x_test, tb_test, y_test, batch_size, num_hid_layers, num_hid_nodes, af, af_key,
-              af_key_value, seed, weight_init_name, weight_init_params, loss, optimizer, init_lr, lr_scheduler, lr_scheduler_params, min_epochs,
-              max_epochs, interval, avg_interval, print_freq, log, enforce_realiz, num_realiz_its):
+def tbnn_ops(x_train, tb_train, y_train, x_valid, tb_valid, y_valid, x_test, tb_test, y_test, batch_size, num_hid_layers,
+             num_hid_nodes, af, af_params, seed, weight_init, weight_init_params, loss, optimizer, init_lr, lr_scheduler, lr_scheduler_params, min_epochs,
+              max_epochs, interval, avg_interval, print_freq, log, enforce_realiz, num_realiz_its, num_tensor_basis):
+
+    # Use GPU if possible
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    dataloader = DataLoader(seed, x_train, tb_train, y_train, x_valid, tb_valid, y_valid, x_test, tb_test, y_test,
-                            batch_size, device)
-    structure = NetworkStructure(num_hid_layers, num_hid_nodes, af)
-    structure.set_af_keyword(af_key, af_key_value)
-    # structure.check_structure(something to do with the dataloader)
-    tbnn = Tbnn(structure, seed=seed, weight_init_name=weight_init_name, weight_init_params=weight_init_params)
+
+    # Prepare batch data in dataloaders and check dataloaders
+    dataloader = DataLoader(x_train, tb_train, y_train, x_valid, tb_valid, y_valid, x_test, tb_test, y_test, batch_size)
+    DataLoader.check_data_loaders(dataloader.train_loader, x_train, tb_train, y_train, num_inputs=5,
+                                  num_tensor_basis=num_tensor_basis)
+    DataLoader.check_data_loaders(dataloader.valid_loader, x_valid, tb_valid, y_valid, num_inputs=5,
+                                  num_tensor_basis=num_tensor_basis)
+    DataLoader.check_data_loaders(dataloader.test_loader, x_test, tb_test, y_test, num_inputs=5,
+                                  num_tensor_basis=num_tensor_basis)
+
+    # Prepare TBNN architecture structure and check structure
+    structure = NetworkStructure(num_hid_layers, num_hid_nodes, af, af_params, num_inputs=5,
+                                 num_tensor_basis=num_tensor_basis)
+    structure.check_structure()
+    print("TBNN architecture structure and data loaders checked")
+
+    # Construct TBNN and perform training, validation and testing
+    tbnn = Tbnn(device, seed, structure, weight_init=weight_init, weight_init_params=weight_init_params).double()
     tbnn_tvt = TbnnTVT(loss, optimizer, init_lr, lr_scheduler, lr_scheduler_params, min_epochs, max_epochs, interval,
-                       avg_interval, model=tbnn, print_freq=print_freq, log=log)
+                       avg_interval, print_freq, log, model=tbnn)
     epoch_count, final_train_rmse, final_valid_rmse = tbnn_tvt.fit(device, train_loader=dataloader.train_loader,
                                                                    valid_loader=dataloader.valid_loader, model=tbnn)
     y_pred, test_rmse = tbnn_tvt.perform_test(device, enforce_realiz, num_realiz_its, log,
@@ -127,11 +153,11 @@ write_error_means()
 """
 
 
-def trial_iter(n_seeds, x, tb, y, train_list, test_list, train_valid_rand_split, valid_list, train_test_rand_split,
-                 train_test_split_frac, train_valid_split_frac, num_tensor_basis, num_hid_layers, num_hid_nodes, af, af_key,
-                 af_key_value, lr_scheduler, lr_scheduler_params, weight_init_name, weight_init_params, max_epochs, min_epochs, init_lr,
-                 interval, avg_interval, loss, optimizer, batch_size, enforce_realiz, num_realiz_its, folder_path,
-                 user_vars, print_freq, database_name):
+def trial_iter(n_seeds, x, tb, y, train_list, valid_list, test_list, train_valid_rand_split, train_valid_split_frac,
+               train_test_rand_split, train_test_split_frac, num_tensor_basis, num_hid_layers, num_hid_nodes, af,
+               af_params, init_lr, lr_scheduler, lr_scheduler_params, weight_init, weight_init_params, max_epochs,
+               min_epochs, interval, avg_interval, loss, optimizer, batch_size, enforce_realiz, num_realiz_its,
+               folder_path, user_vars, print_freq, database_name):
 
     for seed in range(1, n_seeds+1):
         current_folder, log = init_log(folder_path, seed)
@@ -139,18 +165,19 @@ def trial_iter(n_seeds, x, tb, y, train_list, test_list, train_valid_rand_split,
             final_train_rmse_list, final_valid_rmse_list, test_rmse_list = errors_list_init()
             write_param_txt(current_folder, folder_path, user_vars)
             write_param_csv(current_folder, folder_path, user_vars)
+        set_seed(seed)
         x_train, tb_train, y_train, x_test, tb_test, y_test, x_valid, tb_valid, y_valid = \
-            split_database(x=x, tb=tb, y=y, seed=seed, train_list=train_list, test_list=test_list,
-                           train_valid_rand_split=train_valid_rand_split, valid_list=valid_list,
-                           train_test_rand_split=train_test_rand_split, train_test_split_frac=train_test_split_frac,
-                           train_valid_split_frac=train_valid_split_frac, num_tensor_basis=num_tensor_basis,
+            split_database(x=x, tb=tb, y=y, train_list=train_list, valid_list=valid_list, test_list=test_list,
+                           seed=seed, train_valid_rand_split=train_valid_rand_split,
+                           train_test_rand_split=train_test_rand_split, train_valid_split_frac=train_valid_split_frac,
+                           train_test_split_frac=train_test_split_frac, num_tensor_basis=num_tensor_basis,
                            database_name=database_name)
         write_test_truth_bij(folder_path, seed, true_bij=y_test)
-        epoch_count, final_train_rmse, final_valid_rmse, y_pred, test_rmse = \
+        epoch_count, final_train_rmse, final_valid_rmse, y_pred, test_rmse, = \
             tbnn_ops(x_train, tb_train, y_train, x_valid, tb_valid, y_valid, x_test, tb_test, y_test, batch_size,
-                      num_hid_layers, num_hid_nodes, af, af_key, af_key_value, seed, weight_init_name, weight_init_params, loss,
+                      num_hid_layers, num_hid_nodes, af, af_params, seed, weight_init, weight_init_params, loss,
                       optimizer, init_lr, lr_scheduler, lr_scheduler_params, min_epochs, max_epochs, interval, avg_interval, print_freq, log,
-                      enforce_realiz, num_realiz_its)
+                      enforce_realiz, num_realiz_its, num_tensor_basis)
         write_bij_results(folder_path, seed, y_pred, current_folder)
         # del x_train, tb_train, y_train, x_test, tb_test, y_test, x_valid, tb_valid, y_valid, y_pred
         final_train_rmse_list.append(final_train_rmse)
