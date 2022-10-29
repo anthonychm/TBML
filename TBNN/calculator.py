@@ -1,4 +1,7 @@
 import numpy as np
+from numpy import trace as tr
+from numpy import dot as dot
+from numpy.linalg import multi_dot as mdot
 from preprocessor import DataProcessor
 
 
@@ -8,41 +11,94 @@ class PopeDataProcessor(DataProcessor):
     the anisotropy tensor based on the mean strain rate (Sij) and mean rotation rate (Rij) tensors
     """
     @staticmethod
-    def calc_Sij_Rij(grad_u, tke, eps, cap=7.):
+    def calc_Sij_Rij(grad_u, k, eps, cap=7., normalize=False, nondim=True):
         """
         Calculates the strain rate and rotation rate tensors.  Normalizes by k and eps:
         Sij = k/eps * 0.5* (grad_u  + grad_u^T)
         Rij = k/eps * 0.5* (grad_u  - grad_u^T)
         :param grad_u: num_points X 3 X 3
-        :param tke: turbulent kinetic energy
+        :param k: turbulent kinetic energy
         :param eps: turbulent dissipation rate epsilon
         :param cap: This is the max magnitude that Sij or Rij components are allowed.  Greater values
                     are capped at this level
         :return: Sij, Rij: num_points X 3 X 3 tensors
         """
 
+        assert normalize != nondim, "Both normalize and nondimensionalize have been set to true or false"
         num_points = grad_u.shape[0]
         eps = np.maximum(eps, 1e-8)
-        tke_eps = tke / eps
-        Sij = np.zeros((num_points, 3, 3))
-        Rij = np.zeros((num_points, 3, 3))
-        for i in range(num_points):
-            Sij[i, :, :] = tke_eps[i] * 0.5 * (grad_u[i, :, :] + np.transpose(grad_u[i, :, :]))
-            Rij[i, :, :] = tke_eps[i] * 0.5 * (grad_u[i, :, :] - np.transpose(grad_u[i, :, :]))
+        k_eps = k / eps
+        Sij = np.nan((num_points, 3, 3))
+        Rij = np.nan((num_points, 3, 3))
 
-        Sij[Sij > cap] = cap
-        Sij[Sij < -cap] = -cap
-        Rij[Rij > cap] = cap
-        Rij[Rij < -cap] = -cap
+        # Calculate non-dimensional mean strain and rotation rate tensors
+        # Sij = (k/eps)*Sij, Rij = (k/eps)*Rij
+        if nondim is True:
+            for i in range(num_points):
+                Sij[i, :, :] = k_eps[i] * 0.5 * (grad_u[i, :, :] + np.transpose(grad_u[i, :, :]))
+                Rij[i, :, :] = k_eps[i] * 0.5 * (grad_u[i, :, :] - np.transpose(grad_u[i, :, :]))
 
-        # Because we enforced limits on maximum Sij values, we need to re-enforce trace of 0
-        for i in range(num_points):
-            Sij[i, :, :] = Sij[i, :, :] - 1./3. * np.eye(3)*np.trace(Sij[i, :, :])
+            Sij[Sij > cap] = cap
+            Sij[Sij < -cap] = -cap
+            Rij[Rij > cap] = cap
+            Rij[Rij < -cap] = -cap
+
+            # Because we enforced limits on maximum Sij values, we need to re-enforce trace of 0
+            for i in range(num_points):
+                Sij[i, :, :] = Sij[i, :, :] - 1./3. * np.eye(3)*np.trace(Sij[i, :, :])
+
+        # Calculate normalized mean strain and rotation rate tensors
+        # Sij = Sij/(|Sij|+|eps/k|), Rij = Rij/(2*|Rij|)
+        if normalize is True:
+            for i in range(num_points):
+                sij = 0.5 * (grad_u[i, :, :] + np.transpose(grad_u[i, :, :]))
+                rij = 0.5 * (grad_u[i, :, :] - np.transpose(grad_u[i, :, :]))
+                Sij[i, :, :] = sij/(np.linalg.norm(sij) + (1/k_eps[i]))
+                Rij[i, :, :] = rij/(2 * np.linalg.norm(rij))
+
         return Sij, Rij
 
-    def calc_scalar_basis(self, Sij, Rij, is_train=False, cap=2.0, is_scale=True):
+    @staticmethod
+    def calc_Ap(grad_p, density, u, grad_u, normalize=True):
 
-        # to do: Check this
+        # Calculate antisymmetric tensor Ap associated with grad_p
+        if normalize is True:
+            # Normalization from Wang et al. (2018)
+            # grad_p_hat = grad_p/(|grad_p|+|rho*||U*gradU|||)
+            beta = density * np.linalg.norm(np.multiply(u, grad_u))
+            grad_p_norm = np.linalg.norm(grad_p)
+            grad_p_hat = grad_p/(grad_p_norm + beta)
+
+            # Check that all values of grad_p_hat fall between [-1, 1]
+            assert np.any((grad_p_hat < -1) | (grad_p_hat > 1)) is False, "grad_p_hat not constrained between [-1, 1]"
+        else:
+            grad_p_hat = grad_p
+
+        # Calculate Ap = -I x grad_p_hat
+        Ap = np.cross(-np.eye(3, dtype=int), grad_p_hat)
+        return Ap
+
+    @staticmethod
+    def calc_Ak(grad_k, eps, k, normalize=True):
+
+        # Calculate antisymmetric tensor Ak associated with grad_k
+        if normalize is True:
+            # Normalization from Wang et al. (2018)
+            # grad_k_hat = grad_k/(|grad_k|+|eps/sqrt(k)|)
+            beta = eps/np.sqrt(k)
+            grad_k_norm = np.linalg.norm(grad_k)
+            grad_k_hat = grad_k/(grad_k_norm + beta)
+
+            # Check that all values of grad_k_hat fall between [-1, 1] and calculate Ak
+            assert np.any((grad_k_hat < -1) | (grad_k_hat > 1)) is False, "grad_k_hat not constrained between [-1, 1]"
+        else:
+            grad_k_hat = grad_k
+
+        # Calculate Ak = -I x grad_k_hat
+        Ak = np.cross(-np.eye(3, dtype=int), grad_k_hat)
+        return Ak
+
+    def calc_scalar_basis(self, Sij, Rij, Ap, Ak, is_train=False, standardize=True, cap=2.0, pressure=True, tke=True):
 
         """
         Given the non-dimensionalized mean strain rate and mean rotation rate tensors Sij and Rij,
@@ -65,37 +121,104 @@ class PopeDataProcessor(DataProcessor):
         >>> print scalar_basis
         [[ 12.  -2.  24.  -4.  -8.]]
         """
-        DataProcessor.calc_scalar_basis(self, Sij, Rij, is_train=is_train)
+        # DataProcessor.calc_scalar_basis(self, Sij, Rij, is_train=is_train)
         num_points = Sij.shape[0]
-        num_invariants = 5
-        invariants = np.zeros((num_points, num_invariants))
-        for i in range(num_points):
-            invariants[i, 0] = np.trace(np.dot(Sij[i, :, :], Sij[i, :, :]))
-            invariants[i, 1] = np.trace(np.dot(Rij[i, :, :], Rij[i, :, :]))
-            invariants[i, 2] = np.trace(np.dot(Sij[i, :, :], np.dot(Sij[i, :, :], Sij[i, :, :])))
-            invariants[i, 3] = np.trace(np.dot(Rij[i, :, :], np.dot(Rij[i, :, :], Sij[i, :, :])))
-            invariants[i, 4] = np.trace(np.dot(np.dot(Rij[i, :, :], Rij[i, :, :]), np.dot(Sij[i, :, :], Sij[i, :, :])))
 
-        # Renormalize invariants using mean and standard deviation:
-        if is_scale:
+        # Number of invariants = 19 if only one of pressure or tke is True
+        num_invar = 19
+        if pressure is False and tke is False:
+            num_invar = 5
+        elif pressure is True and tke is True:
+            num_invar = 47
+
+        invars = np.nan((num_points, num_invar))
+
+        # Function for constructing invariants that use the antisymmetric tensors of grad_p and grad_k
+        def anti_invars(invars, i, sij, rij, anti, j_start=6):
+            invars[i, j_start] = tr(dot(anti, anti))
+            invars[i, j_start + 1] = tr(mdot(anti, anti, sij))
+            invars[i, j_start + 2] = tr(mdot(anti, anti, sij, sij))
+            invars[i, j_start + 3] = tr(mdot(anti, anti, sij, anti, sij, sij))
+            invars[i, j_start + 4] = tr(dot(rij, anti))
+            invars[i, j_start + 5] = tr(mdot(rij, anti, sij))
+            invars[i, j_start + 6] = tr(mdot(rij, anti, sij, sij))
+            invars[i, j_start + 7] = tr(mdot(rij, rij, anti, sij))  # cyclic permutation
+            invars[i, j_start + 8] = tr(mdot(anti, anti, rij, sij))
+            invars[i, j_start + 9] = tr(mdot(rij, rij, anti, sij, sij))  # cyclic permutation
+            invars[i, j_start + 10] = tr(mdot(anti, anti, rij, sij, sij))
+            invars[i, j_start + 11] = tr(mdot(rij, rij, sij, anti, sij, sij))  # cyclic permutation
+            invars[i, j_start + 12] = tr(mdot(anti, anti, sij, rij, sij, sij))
+
+            return invars
+
+        for i in range(num_points):
+            sij = Sij[i, :, :]
+            rij = Rij[i, :, :]
+
+            # Invariants of Sij and Rij
+            invars[i, 0] = tr(dot(sij, sij))
+            invars[i, 1] = tr(dot(rij, rij))
+            invars[i, 2] = tr(mdot(sij, sij, sij))
+            invars[i, 3] = tr(mdot(rij, rij, sij))
+            invars[i, 4] = tr(mdot(rij, rij, sij, sij))
+
+            if pressure is True or tke is True:
+                invars[i, 5] = tr(mdot(rij, rij, sij, rij, sij, sij))
+
+            # Invariants of Sij, Rij and Ap
+            if pressure is True and tke is False:
+                ap = Ap[i, :, :]
+                invars = anti_invars(invars, i, sij, rij, ap)
+
+            # Invariants of Sij, Rij and Ak
+            elif pressure is False and tke is True:
+                ak = Ak[i, :, :]
+                invars = anti_invars(invars, i, sij, rij, ak)
+
+            # Invariants of Sij, Rij, Ap and Ak
+            elif pressure is True and tke is True:
+                ap = Ap[i, :, :]
+                invars = anti_invars(invars, i, sij, rij, ap)
+                ak = Ak[i, :, :]
+                invars = anti_invars(invars, i, sij, rij, ak, j_start=19)
+
+                invars[i, 32] = tr(mdot(ap, ak))
+                invars[i, 33] = tr(mdot(ap, ak, sij))
+                invars[i, 34] = tr(mdot(ap, ak, sij, sij))
+                invars[i, 35] = tr(mdot(ap, ap, ak, sij))  # cyclic permutation
+                invars[i, 36] = tr(mdot(ak, ak, ap, sij))
+                invars[i, 37] = tr(mdot(ap, ap, ak, sij, sij))  # cyclic permutation
+                invars[i, 38] = tr(mdot(ak, ak, ap, sij, sij))
+                invars[i, 39] = tr(mdot(ap, ap, sij, ak, sij, sij))  # cyclic permutation
+                invars[i, 40] = tr(mdot(ak, ak, sij, ap, sij, sij))
+                invars[i, 41] = tr(mdot(rij, ap, ak))
+                invars[i, 42] = tr(mdot(rij, ap, ak, sij))
+                invars[i, 43] = tr(mdot(rij, ak, ap, sij))
+                invars[i, 44] = tr(mdot(rij, ap, ak, sij, sij))
+                invars[i, 45] = tr(mdot(rij, ak, ap, sij, sij))
+                invars[i, 46] = tr(mdot(rij, ap, sij, ak, sij, sij))
+
+        # Standardize invariants using mean and standard deviation
+        # This is recommended over normalization for features that have extremely high or low values
+        if standardize is True:
             if self.mu is None or self.std is None:
                 is_train = True
-            if is_train:
-                self.mu = np.zeros((num_invariants, 2))
-                self.std = np.zeros((num_invariants, 2))
-                self.mu[:, 0] = np.mean(invariants, axis=0)
-                self.std[:, 0] = np.std(invariants, axis=0)
+            if is_train is True:
+                self.mu = np.zeros((num_invar, 2))
+                self.std = np.zeros((num_invar, 2))
+                self.mu[:, 0] = np.mean(invars, axis=0)  # take mean of all the invariants
+                self.std[:, 0] = np.std(invars, axis=0)  # take std of all the invariants
 
-            invariants = (invariants - self.mu[:, 0]) / self.std[:, 0]
-            invariants[invariants > cap] = cap  # Cap max magnitude
-            invariants[invariants < -cap] = -cap
-            invariants = invariants * self.std[:, 0] + self.mu[:, 0]
-            if is_train:
-                self.mu[:, 1] = np.mean(invariants, axis=0)
-                self.std[:, 1] = np.std(invariants, axis=0)
+            invars = (invars - self.mu[:, 0]) / self.std[:, 0]
+            invars[invars > cap] = cap  # Cap max of the invariants
+            invars[invars < -cap] = -cap  # Cap min of the invariants
+            invars = invars * self.std[:, 0] + self.mu[:, 0]  # Undo the standardization
+            if is_train is True:
+                self.mu[:, 1] = np.mean(invars, axis=0)  # take mean of all the updated invariants
+                self.std[:, 1] = np.std(invars, axis=0)  # take std of all the updated invariants
 
-            invariants = (invariants - self.mu[:, 1]) / self.std[:, 1]  # Renormalize a second time after capping
-        return invariants
+            invars = (invars - self.mu[:, 1]) / self.std[:, 1]  # Re-standardize a second time after capping
+        return invars
 
     @staticmethod
     def calc_tensor_basis(Sij, Rij, num_tensor_basis=10, is_scale=True):
@@ -180,7 +303,7 @@ class PopeDataProcessor(DataProcessor):
         return T_flat
 
     @staticmethod
-    def calc_output(tauij):
+    def calc_output(tauij): #TO DO: Check calculation of bij, especially /2k part
         """
         Given Reynolds stress tensor (num_points X 3 X 3), return flattened non-dimensional anisotropy tensor
         :param tauij: Reynolds stress tensor
