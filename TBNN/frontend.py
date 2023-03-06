@@ -1,100 +1,139 @@
 """
 ===============================================
-= This code has been written by Anthony Man   =
-= PhD student at The University of Manchester =
+===== This code was written by Anthony Man ====
+====== The University of Manchester, 2022 =====
 ===============================================
 
-This program performs all the steps for training and testing a Tensor Basis Neural Network (TBNN) for any kind of
-turbulent flow problem.
+This program performs all the steps for training and testing a Tensor Basis Neural Network
+(TBNN) for any kind of turbulent flow problem.
 
-Input 1: Five invariants of Sij and Rij
-Input 2: Tensor basis of Sij and Rij
-Sij = Mean strain rate tensor, Rij = Mean rotation rate tensor
-Both Sij and Rij are from RANS simulations and normalized by k and epsilon
-Output: Reynolds stress anisotropy tensor bij
-True bij is from highly-resolved LES or DNS. The TBNN aims to produce this true output.
+Input 1: Invariants of Sij, Rij, gradp and gradk.
+Input 2: Tensor basis of Sij and Rij.
+Sij = Mean strain rate tensor, Rij = Mean rotation rate tensor (both Sij and Rij are
+non-dimensionalised by k/eps). gradp = pressure gradient, gradk = TKE gradient.
+Sij, Rij, gradp and gradk are from RANS simulations.
+
+Output: Reynolds stress anisotropy tensor bij.
+True bij can be from highly-resolved LES or DNS or experimental results. The TBNN aims to
+produce this true output.
 
 Reference for data driven turbulence modelling TBNN implementation:
-Ling, J., Kurzawski, A. and Templeton, J., 2016. Reynolds averaged turbulence modelling using deep neural
-networks with embedded invariance. Journal of Fluid Mechanics, 807, pp.155-166.
+Ling, J., Kurzawski, A. and Templeton, J., 2016. Reynolds averaged turbulence modelling
+using deep neural networks with embedded invariance. Journal of Fluid Mechanics, 807,
+pp.155-166.
+
+Syntax and run checked by AM, 17/12/2022
+PoF Oct 2022 models run using:
+Local: Python 3.10.9, numpy 1.23.5, torch 1.13.0 and pandas 1.5.2
+CSF4: Python 3.10.4, numpy 1.22.3, torch 1.13.1 and pandas 1.4.2
 """
 
+import numpy as np
 import timeit
+import case_dicts
 from pred_iterator import preprocessing, trial_iter
 from results_writer import write_time, create_parent_folders
 
 
-def main():
+def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0):
     # Define parameters
-    num_hid_layers = 3  # Number of hidden layers in the TBNN, default = 2
-    num_hid_nodes = [7, 8, 2]  # Number of nodes in the hidden layers given as a vector, default = [5, 5, 5, 5, 5]
-    num_tensor_basis = 3  # Number of tensor bases to predict, also the num of output nodes, default = 10
-    max_epochs = 50  # Max number of training epochs, default = 2000
-    min_epochs = 10  # Min number of training epochs, default = 1000
-    interval = 2  # Frequency at which convergence is checked, default = 100
-    avg_interval = 3  # Number of intervals averaged over for early stopping criteria, default = 4
-    enforce_realiz = True  # Boolean for enforcing realizability on Reynolds stresses, default = True ##
+    num_hid_layers = 2  # Number of hidden layers in the TBNN, default = 3
+    num_hid_nodes = [50] * num_hid_layers  # Number of nodes in the hidden layers given
+    # as a vector, default = [5, 5, 5]
+    num_tensor_basis = 10  # Number of tensor bases for bij prediction, also the num of
+    # output nodes, default = 10
+    max_epochs = 100000  # Max number of training epochs, default = 2000
+    min_epochs = 25  # Min number of training epochs, default = 1000
+    interval = 4  # Frequency of epochs at which the model is evaluated on validation
+    # dataset, default = 100
+    avg_interval = 3  # Number of intervals averaged over for early stopping criteria,
+    # default = 4
+    enforce_realiz = True  # Boolean for enforcing realizability on Reynolds stresses,
+    # default = True
     num_realiz_its = 5  # Number of iterations for realizability enforcing, default = 5
 
     # Define advanced parameters
-    af = ["LeakyReLU", "ELU", "LeakyReLU"]
-    # af = ["ELU"]*(num_hid_layers-1)  # Nonlinear activation function, default = ["ELU"]*(num_hid_layers-1)
-    af_params = ["negative_slope=0.012", "alpha=0.8", "negative_slope=0.009"]
-    #af_params = ["alpha=1.0, inplace=False"]*(num_hid_layers-1)  # Parameters of the nonlinear activation function,
-                                                             # default = ["alpha=1.0, inplace=False"]*(num_hid_layers-1)
-    weight_init = "xavier_uniform_"  # Weight initialiser algorithm, default = "xavier_uniform"
-    weight_init_params = "gain=1"  # Arguments of the weight initialiser algorithm, default = "gain=1.0"
-    init_lr = 0.001  # Initial learning rate, default = 0.01
+    af = ["SiLU"] * num_hid_layers  # Nonlinear activation function, default =
+    # ["ELU"]*(num_hid_layers)
+    af_params = ["inplace=False"] * num_hid_layers  # Parameters of the nonlinear
+    # activation function, default = ["alpha=1.0, inplace=False"]*(num_hid_layers)
+    weight_init = "kaiming_normal_"  # Weight initialiser algorithm,
+    # default = "kaiming_normal_"
+    weight_init_params = "nonlinearity=leaky_relu"  # Arguments of the weight initialiser
+    # algorithm, default = "nonlinearity=leaky_relu"
+    init_lr = 0.01  # Initial learning rate, default = 0.01
     lr_scheduler = "ExponentialLR"  # Learning rate scheduler, default = ExponentialLR
-    lr_scheduler_params = "gamma=0.1"  # Parameters of learning rate scheduler, default = "gamma=0.1"
+    lr_scheduler_params = "gamma=0.98"  # Parameters of learning rate scheduler,
+    # default = "gamma=0.9"
     loss = "MSELoss"  # Loss function, default = "MSELoss"
     optimizer = "Adam"  # Optimizer algorithm, default = "Adam"
-    batch_size = 5  # Training batch size, default = 1
+    batch_size = [256]  # [16, 32, 64, 128, 256]  # Training batch size, default = 16
 
-    # Define database and data splits for training, validation and testing
-    database_name = "full_set_no_walls.txt"  # Data source
-    n_skiprows = 1  # Number of rows to skip at beginning of data source when reading
-    train_test_rand_split = False  # Boolean for randomly splitting entire database for training and testing,
-                                   # default = False
-    train_test_split_frac = 0  # Fraction of entire database used for training and validation if random split = True,
-                               # default = 0
-    train_valid_rand_split = False  # Boolean for randomly splitting training database for training and validation,
-                                    # default = False
-    train_valid_split_frac = 0  # Fraction of training database used for actual training, the other fraction is used
-                                # for validation, default = 0. Train-test split must be run before this.
+    # Define TBNN inputs
+    incl_p_invars = True  # Include pressure invariants in inputs
+    incl_tke_invars = True  # Include tke invariants in inputs
+    incl_input_markers = False  # Include scalar markers in inputs
+    num_input_markers = None  # Number of scalar markers in inputs
+    rho = 1.514  # Density of air at -40C with nu = 1e-5 m^2/s
+
+    # Define splitting of training, validation and testing datasets
+    train_test_rand_split = False  # Randomly split entire database for training and
+    # testing, default = False
+    train_test_split_frac = None  # Fraction of entire database used for training and
+    # validation if train_test_rand_split = True, default = 0
+    train_valid_rand_split = False  # Randomly split training database for training and
+    # validation, default = False
+    train_valid_split_frac = None  # Fraction of training database used for actual
+    # training while the other fraction is used for validation if
+    # train_valid_rand_split = True, default = 0.
 
     # Set case lists if train_test_rand_split and train_valid_rand_split = False
-    train_list = [180, 290, 490, 760, 945]
-    valid_list = [395]
-    test_list = [590]
+    train_list = [1, 3]
+    valid_list = [2.5]
+    test_list = [2, 4]
 
     # Other
-    n_seeds = 5  # Number of reproducible TBNN predictions to save
-    print_freq = 2  # Console print frequency
+    num_dims = 2  # Number of dimensions in dataset
+    num_seeds = 1  # Number of reproducible TBNN predictions to save
+    print_freq = 4  # Console print frequency
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
     folder_path = create_parent_folders()
-    start = timeit.default_timer()
-    x, tb, y = preprocessing(enforce_realiz=enforce_realiz, num_realiz_its=num_realiz_its, database_name=database_name,
-                             n_skiprows=n_skiprows, num_tensor_basis=num_tensor_basis)
-    user_vars = locals()
-    current_folder = \
-        trial_iter(n_seeds=n_seeds, x=x, tb=tb, y=y, train_list=train_list, valid_list=valid_list, test_list=test_list,
-                   train_valid_rand_split=train_valid_rand_split, train_valid_split_frac=train_valid_split_frac,
-                   train_test_rand_split=train_test_rand_split, train_test_split_frac=train_test_split_frac,
-                   num_tensor_basis=num_tensor_basis, num_hid_layers=num_hid_layers, num_hid_nodes=num_hid_nodes, af=af,
-                   af_params=af_params, init_lr=init_lr, lr_scheduler=lr_scheduler,
-                   lr_scheduler_params=lr_scheduler_params, weight_init=weight_init,
-                   weight_init_params=weight_init_params, max_epochs=max_epochs, min_epochs=min_epochs,
-                   interval=interval, avg_interval=avg_interval, loss=loss, optimizer=optimizer, batch_size=batch_size,
-                   enforce_realiz=enforce_realiz, num_realiz_its=num_realiz_its, folder_path=folder_path,
-                   user_vars=user_vars, print_freq=print_freq, database_name=database_name)
-    stop = timeit.default_timer()
-    write_time(start, stop, folder_path, current_folder)
-    print("Finish")
+
+    for b in batch_size:
+        start = timeit.default_timer()
+        coords, x, tb, y, num_inputs = \
+            preprocessing(database, num_dims, num_input_markers, num_zonal_markers,
+                          incl_p_invars, incl_tke_invars, incl_input_markers,
+                          incl_zonal_markers, rho, num_tensor_basis, enforce_realiz,
+                          num_realiz_its)  # ✓
+        user_vars = locals()
+        current_folder = \
+            trial_iter(num_seeds, coords, x, tb, y, train_list, valid_list, test_list,
+                       train_valid_rand_split, train_valid_split_frac,
+                       train_test_rand_split, train_test_split_frac, num_tensor_basis,
+                       num_hid_layers, num_hid_nodes, af, af_params, init_lr, lr_scheduler,
+                       lr_scheduler_params, weight_init, weight_init_params, max_epochs,
+                       min_epochs, interval, avg_interval, loss, optimizer, b,
+                       enforce_realiz, num_realiz_its, folder_path, user_vars, print_freq,
+                       case_dict, num_inputs)  # ✓
+        stop = timeit.default_timer()
+        write_time(start, stop, folder_path, current_folder)  # ✓
+        print("TBNN finished")
 
 
 if __name__ == "__main__":
-    main()
+
+    # Load database and associated dictionary ✓
+    database_name = "FBFS5_full_set_no_walls.txt"  # Data source
+    db2case = case_dicts.case_dict_names()
+    case_dict, _, num_skip_rows = db2case[database_name]  # ✓
+    database = np.loadtxt(database_name, skiprows=num_skip_rows)
+
+    # Run TBNN ✓
+    tbnn_main(database, case_dict)  # ✓
+
 
 
 
