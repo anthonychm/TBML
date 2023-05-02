@@ -245,11 +245,13 @@ class TkennTVT:
                 valid_loss_list.append(avg_valid_loss)
                 continue_train = self.check_conv(valid_loss_list, self.min_epochs,
                                                  self.avg_interval, epoch_count)  # ✓
+                if continue_train is False:
+                    break
 
             # The check_conv method ensures number of epochs is > min epochs
             # The if statement below ensures number of epochs is < max epochs ✓
             if epoch_count > self.max_epochs:
-                continue_train = False
+                break
 
             # Print average training and validation RMSEs per data point in console  # ✓
             if epoch_count % self.print_freq == 0:

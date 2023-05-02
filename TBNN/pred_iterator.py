@@ -263,3 +263,57 @@ def trial_iter(num_seeds, coords, x, tb, y, train_list, valid_list, test_list,
                           folder_path, current_folder)  # ✓
 
     return current_folder
+
+
+def trial_iter_v2(num_seeds, x_train, tb_train, y_train, x_valid, tb_valid, y_valid,
+                  coords_test, x_test, tb_test, y_test, num_tensor_basis, num_hid_layers,
+                  num_hid_nodes, af, af_params, init_lr, lr_scheduler,
+                  lr_scheduler_params, weight_init, weight_init_params, max_epochs,
+                  min_epochs, interval, avg_interval, loss, optimizer, batch_size,
+                  enforce_realiz, num_realiz_its, folder_path, user_vars, print_freq,
+                  num_inputs):  # ✓
+    """
+    After obtaining x, tb and y from preprocessing, run this function num_seeds times to
+    train num_seeds TBNN instances and obtain num_seeds predictions:
+
+    - Create new trial folder. A trial is a particular set-up of parameter values on the
+      frontend.py file.
+    - If seed = 1, initialise TVT error lists and write the parameter values.
+    - Set the seed for all operations.
+    - Perform TBNN training, validation and testing.
+    - Write results for each TBNN instance (aka seed).
+    - After all seeds for a particular trial, write results for the trial.
+    """
+    for seed in range(1, num_seeds+1):
+        # Set up results logs, lists and files ✓
+        current_folder, log = init_log(folder_path, seed)  # ✓
+        if seed == 1:
+            final_train_rmse_list, final_valid_rmse_list, test_rmse_list = \
+                errors_list_init()  # ✓
+            write_param_txt(current_folder, folder_path, user_vars)  # ✓
+            write_param_csv(current_folder, folder_path, user_vars)  # ✓
+            write_test_truth_bij(coords_test, folder_path, y_test)  # ✓
+        set_seed(seed)  # ✓
+
+        # Run TBNN operations ✓
+        epoch_count, final_train_rmse, final_valid_rmse, y_pred, test_rmse, = \
+            tbnn_ops(x_train, tb_train, y_train, x_valid, tb_valid, y_valid, x_test,
+                     tb_test, y_test, batch_size, num_hid_layers, num_hid_nodes, af,
+                     af_params, seed, weight_init, weight_init_params, loss, optimizer,
+                     init_lr, lr_scheduler, lr_scheduler_params, min_epochs, max_epochs,
+                     interval, avg_interval, print_freq, log, enforce_realiz,
+                     num_realiz_its, num_tensor_basis, num_inputs)  # ✓
+
+        # Write results for each seed ✓
+        write_bij_results(coords_test, folder_path, seed, y_pred, current_folder)  # ✓
+        final_train_rmse_list.append(final_train_rmse)
+        final_valid_rmse_list.append(final_valid_rmse)
+        test_rmse_list.append(test_rmse)
+
+    # Write results for each trial ✓
+    write_trial_rmse_csv(final_train_rmse_list, final_valid_rmse_list, test_rmse_list,
+                         folder_path, current_folder)  # ✓
+    write_error_means_csv(final_train_rmse_list, final_valid_rmse_list, test_rmse_list,
+                          folder_path, current_folder)  # ✓
+
+    return current_folder

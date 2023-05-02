@@ -31,19 +31,21 @@ CSF4: Python 3.10.4, numpy 1.22.3, torch 1.13.1 and pandas 1.4.2
 import numpy as np
 import timeit
 import case_dicts
-from pred_iterator import preprocessing, trial_iter
+from pred_iterator import preprocessing, trial_iter, trial_iter_v2
 from results_writer import write_time, create_parent_folders
 
 
-def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0):
+def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0,
+              zones=np.nan, zonal_train_dataset=np.nan, zonal_valid_dataset=np.nan,
+              zonal_test_dataset=np.nan, version="v1"):
     # Define parameters
-    num_hid_layers = 2  # Number of hidden layers in the TBNN, default = 3
-    num_hid_nodes = [50] * num_hid_layers  # Number of nodes in the hidden layers given
+    num_hid_layers = 5  # Number of hidden layers in the TBNN, default = 3
+    num_hid_nodes = [20] * num_hid_layers  # Number of nodes in the hidden layers given
     # as a vector, default = [5, 5, 5]
     num_tensor_basis = 10  # Number of tensor bases for bij prediction, also the num of
     # output nodes, default = 10
     max_epochs = 100000  # Max number of training epochs, default = 2000
-    min_epochs = 25  # Min number of training epochs, default = 1000
+    min_epochs = 100  # Min number of training epochs, default = 1000
     interval = 4  # Frequency of epochs at which the model is evaluated on validation
     # dataset, default = 100
     avg_interval = 3  # Number of intervals averaged over for early stopping criteria,
@@ -63,15 +65,15 @@ def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0
     # algorithm, default = "nonlinearity=leaky_relu"
     init_lr = 0.01  # Initial learning rate, default = 0.01
     lr_scheduler = "ExponentialLR"  # Learning rate scheduler, default = ExponentialLR
-    lr_scheduler_params = "gamma=0.98"  # Parameters of learning rate scheduler,
+    lr_scheduler_params = "gamma=0.95"  # Parameters of learning rate scheduler,
     # default = "gamma=0.9"
     loss = "MSELoss"  # Loss function, default = "MSELoss"
     optimizer = "Adam"  # Optimizer algorithm, default = "Adam"
-    batch_size = [256]  # [16, 32, 64, 128, 256]  # Training batch size, default = 16
+    batch_size = 32  # Training batch size, default = 16
 
     # Define TBNN inputs
-    incl_p_invars = True  # Include pressure invariants in inputs
-    incl_tke_invars = True  # Include tke invariants in inputs
+    incl_p_invars = False  # Include pressure invariants in inputs
+    incl_tke_invars = False  # Include tke invariants in inputs
     incl_input_markers = False  # Include scalar markers in inputs
     num_input_markers = None  # Number of scalar markers in inputs
     rho = 1.514  # Density of air at -40C with nu = 1e-5 m^2/s
@@ -100,9 +102,9 @@ def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
     folder_path = create_parent_folders()
+    start = timeit.default_timer()
 
-    for b in batch_size:
-        start = timeit.default_timer()
+    if version == "v1":
         coords, x, tb, y, num_inputs = \
             preprocessing(database, num_dims, num_input_markers, num_zonal_markers,
                           incl_p_invars, incl_tke_invars, incl_input_markers,
@@ -115,12 +117,45 @@ def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0
                        train_test_rand_split, train_test_split_frac, num_tensor_basis,
                        num_hid_layers, num_hid_nodes, af, af_params, init_lr, lr_scheduler,
                        lr_scheduler_params, weight_init, weight_init_params, max_epochs,
-                       min_epochs, interval, avg_interval, loss, optimizer, b,
+                       min_epochs, interval, avg_interval, loss, optimizer, batch_size,
                        enforce_realiz, num_realiz_its, folder_path, user_vars, print_freq,
                        case_dict, num_inputs)  # ✓
-        stop = timeit.default_timer()
-        write_time(start, stop, folder_path, current_folder)  # ✓
-        print("TBNN finished")
+
+    elif version == "v2":
+        for zone in zones:
+            coords_train, x_train, tb_train, y_train, num_inputs = \
+                preprocessing(zonal_train_dataset[zone], num_dims, num_input_markers,
+                              num_zonal_markers, incl_p_invars, incl_tke_invars,
+                              incl_input_markers, incl_zonal_markers, rho,
+                              num_tensor_basis, enforce_realiz, num_realiz_its)  #
+
+            coords_valid, x_valid, tb_valid, y_valid, num_inputs = \
+                preprocessing(zonal_valid_dataset[zone], num_dims, num_input_markers,
+                              num_zonal_markers, incl_p_invars, incl_tke_invars,
+                              incl_input_markers, incl_zonal_markers, rho,
+                              num_tensor_basis, enforce_realiz, num_realiz_its)  #
+
+            coords_test, x_test, tb_test, y_test, num_inputs = \
+                preprocessing(zonal_test_dataset[zone], num_dims, num_input_markers,
+                              num_zonal_markers, incl_p_invars, incl_tke_invars,
+                              incl_input_markers, incl_zonal_markers, rho,
+                              num_tensor_basis, enforce_realiz, num_realiz_its)  #
+
+            user_vars = locals()
+            current_folder = \
+                trial_iter_v2(num_seeds, x_train, tb_train, y_train, x_valid, tb_valid,
+                              y_valid, coords_test, x_test, tb_test, y_test,
+                              num_tensor_basis, num_hid_layers, num_hid_nodes, af,
+                              af_params, init_lr, lr_scheduler, lr_scheduler_params,
+                              weight_init, weight_init_params, max_epochs, min_epochs,
+                              interval, avg_interval, loss, optimizer, batch_size,
+                              enforce_realiz, num_realiz_its, folder_path, user_vars,
+                              print_freq, num_inputs)  #
+    else:
+        raise Exception("Invalid version")
+    stop = timeit.default_timer()
+    write_time(start, stop, folder_path, current_folder)  # ✓
+    print("TBNN finished")
 
 
 if __name__ == "__main__":

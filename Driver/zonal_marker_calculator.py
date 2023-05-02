@@ -4,25 +4,27 @@ Version 1 (for Apr 2023)
 """
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 
-def main():
+def calc_zonal_markers():
     # Choose CFD case from: "BUMP_h20" "BUMP_h26" "BUMP_h31", "BUMP_h38", "BUMP_h42", "CBFS_13700",
     # "CNDV_12600", "CNDV_20580", "PHLL_case_0p5", "PHLL_case_0p8", "PHLL_case_1p0", "PHLL_case_1p2", "PHLL_case_1p5"
     # "DUCT_1100", "DUCT_1150", "DUCT_1250", "DUCT_1300", "DUCT_1350", "DUCT_1400", "DUCT_1500", "DUCT_1600"
     # "DUCT_1800", "DUCT_2000", "DUCT_2205", "DUCT_2400" "DUCT_2600", "DUCT_2900", "DUCT_3200", "DUCT_3500"
     # "FBFS_1800", "FBFS_3600", "FBFS_4500", "FBFS_5400", "FBFS_7200"
-    case = "CNDV_20580"
+    case = "FBFS_7200"
 
     parent_path = get_parent_path(case)
-    S, R, k, Ux, Uy, Uz, wall_dist = load_marker_data_apr2023(case, parent_path)  # ✓
+    var_dict = load_marker_data_apr2023(case, parent_path, ["S", "R", "k", "Ux", "Uy", "Uz", "wall_dist"])  # ✓
+    S, R, k, Ux, Uy, Uz, wall_dist = unpack_var_dict_calc(var_dict)  # ✓
     nu = get_nu(case)
-    nd_Q = calc_nd_Q(S, R)
-    nd_TI = calc_nd_TI(k, Ux, Uy, Uz)
-    nd_Ux = calc_nd_Ux(Ux, Uy, Uz)
+    #nd_Q = calc_nd_Q(S, R)
+    #nd_TI = calc_nd_TI(k, Ux, Uy, Uz)
+    #nd_Ux = calc_nd_Ux(Ux, Uy, Uz)
     Re_y = calc_Re_y(k, wall_dist, nu)
-    write_vars(case, vars(), "nd_Q", "nd_TI", "nd_Ux", "Re_y")  # ✓
-    return nd_Q, nd_TI, nd_Ux, Re_y
+    write_vars(case, vars(), "Re_y")  # ✓
+    return
 
 
 def get_parent_path(case):
@@ -48,9 +50,8 @@ def create_var_dict(var_list, parent_path, child_path, case):
     return var_dict
 
 
-def load_marker_data_apr2023(case, parent_path):
+def load_marker_data_apr2023(case, parent_path, var_list):
     # Load data for calculating zonal markers ✓
-    var_list = ["S", "R", "k", "Ux", "Uy", "Uz", "wall_dist"]
     if "FBFS" in case:
         var_dict = create_var_dict(var_list, parent_path, "/" + case + "/", case)
     elif any(name in case for name in ["BUMP", "CBFS", "CNDV", "PHLL", "DUCT"]):
@@ -58,6 +59,11 @@ def load_marker_data_apr2023(case, parent_path):
         var_dict = create_var_dict(var_list, parent_path, "/" + turb_model + "/" + turb_model + "_", case)
     else:
         raise Exception("No matching data for this case")
+    return var_dict
+
+
+def unpack_var_dict_calc(var_dict):
+    # Unpack variable dictionary for calculating zonal markers
     return var_dict["S"], var_dict["R"], var_dict["k"], var_dict["Ux"], var_dict["Uy"], var_dict["Uz"], \
         var_dict["wall_dist"]
 
@@ -142,12 +148,58 @@ def write_vars(case, vars_dict, *args):
     for var in args:
         np.savetxt(case + "_" + var + ".txt", vars_dict[var])
 
-# def write_vars(var_dict, case):
-#     # Write marker results as a .txt file
-#     for key in var_dict:
-#         np.savetxt(case + "_" + key + ".txt", var_dict[key])
+
+def load_zonal_markers_apr2023(case, parent_path, marker_list):
+    # Load calculated zonal markers ✓
+    if "FBFS" in case:
+        marker_dict = create_var_dict(marker_list, parent_path, "/zonal criteria/", case)
+    elif any(name in case for name in ["BUMP", "CBFS", "CNDV", "PHLL", "DUCT"]):
+        turb_model = "komegasst"
+        marker_dict = create_var_dict(marker_list, parent_path, "/" + turb_model + "/zonal criteria/", case)
+    else:
+        raise Exception("No matching zonal marker results for this case")
+    return marker_dict
+
+
+def plot_zonal_markers(Cx, Cy, marker, marker_dict):
+    # Plot zonal marker with tricontourf ✓
+
+    def get_marker_level(marker):
+        level_dict = {
+            "nd_Q": 0,
+            "nd_TI": 0.5,
+            "nd_Ux": 0,
+            "Re_y": 1
+        }
+        return level_dict[marker]
+
+    level = get_marker_level(marker)
+    contourf = plt.tricontour(Cx, Cy, marker_dict[marker], levels=[level])
+    #plt.colorbar()
+    plt.show()
+    return contourf
+
+
+def check_zonal_markers():
+    # Plot zonal markers to check them against ParaView iso-volumes  ✓
+    case = "FBFS_7200"
+    marker = "Re_y"  # nd_Q, nd_TI, nd_Ux, Re_y
+    parent_path = get_parent_path(case)
+    coords_dict = load_marker_data_apr2023(case, parent_path, ["Cx", "Cy", "Cz"])
+    Cx = coords_dict["Cx"]
+    Cy = coords_dict["Cy"]
+    Cz = coords_dict["Cz"]
+    # assert (len(set(Cz)) == 1)
+
+    marker_dict = load_zonal_markers_apr2023(case, parent_path, ["nd_Q", "nd_TI", "nd_Ux", "Re_y"])
+    plt.scatter(Cx, Cy, c=marker_dict[marker], s=10, cmap='viridis')
+    plt.colorbar()
+    plt.show()
+    # _ = plot_zonal_markers(Cx, Cy, marker, marker_dict)
+
+    # PHLL, BUMP, CNDV, CBFS, FBFS checked
 
 
 if __name__ == "__main__":
-    main()
+    check_zonal_markers()
     print("finish")
