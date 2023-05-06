@@ -124,19 +124,19 @@ def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0
     elif version == "v2":
         for zone in zones:
             coords_train, x_train, tb_train, y_train, num_inputs = \
-                preprocessing(zonal_train_dataset[zone], num_dims, num_input_markers,
+                preprocessing(zonal_train_dataset[zone][:, 1:], num_dims, num_input_markers,
                               num_zonal_markers, incl_p_invars, incl_tke_invars,
                               incl_input_markers, incl_zonal_markers, rho,
                               num_tensor_basis, enforce_realiz, num_realiz_its)  #
 
             coords_valid, x_valid, tb_valid, y_valid, num_inputs = \
-                preprocessing(zonal_valid_dataset[zone], num_dims, num_input_markers,
+                preprocessing(zonal_valid_dataset[zone][:, 1:], num_dims, num_input_markers,
                               num_zonal_markers, incl_p_invars, incl_tke_invars,
                               incl_input_markers, incl_zonal_markers, rho,
                               num_tensor_basis, enforce_realiz, num_realiz_its)  #
 
             coords_test, x_test, tb_test, y_test, num_inputs = \
-                preprocessing(zonal_test_dataset[zone], num_dims, num_input_markers,
+                preprocessing(zonal_test_dataset[zone][:, 1:], num_dims, num_input_markers,
                               num_zonal_markers, incl_p_invars, incl_tke_invars,
                               incl_input_markers, incl_zonal_markers, rho,
                               num_tensor_basis, enforce_realiz, num_realiz_its)  #

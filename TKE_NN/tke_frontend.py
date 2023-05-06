@@ -31,7 +31,8 @@ from TBNN import case_dicts, results_writer
 
 def tkenn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0,
                zones=np.nan, zonal_train_dataset=np.nan, zonal_valid_dataset=np.nan,
-               zonal_test_dataset=np.nan, version="v1"):
+               zonal_test_dataset=np.nan, zonal_test_case_tags=np.nan,
+               zonal_test_output_normzr=np.nan, version="v1"):
     # Define parameters
     num_hid_layers = 5  # Number of hidden layers in the TKENN, default = 2
     num_hid_nodes = [20] * num_hid_layers  # Number of nodes in the hidden layers given
@@ -110,20 +111,23 @@ def tkenn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=
 
     elif version == "v2":
         for zone in zones:
-            coords_train, x_train, y_train, num_inputs = \
-                preprocessing(zonal_train_dataset[zone], num_dims, num_input_markers,
+            coords_train, x_train, _, num_inputs = \
+                preprocessing(zonal_train_dataset[zone][:, 1:], num_dims, num_input_markers,
                               num_zonal_markers, incl_p_invars, incl_tke_invars,
                               incl_input_markers, incl_zonal_markers, rho, incl_RANS_k)
+            y_train = zonal_train_dataset[zone][:, 0]
 
-            coords_valid, x_valid, y_valid, num_inputs = \
-                preprocessing(zonal_valid_dataset[zone], num_dims, num_input_markers,
+            coords_valid, x_valid, _, num_inputs = \
+                preprocessing(zonal_valid_dataset[zone][:, 1:], num_dims, num_input_markers,
                               num_zonal_markers, incl_p_invars, incl_tke_invars,
                               incl_input_markers, incl_zonal_markers, rho, incl_RANS_k)
+            y_valid = zonal_valid_dataset[zone][:, 0]
 
-            coords_test, x_test, y_test, num_inputs = \
-                preprocessing(zonal_test_dataset[zone], num_dims, num_input_markers,
+            coords_test, x_test, _, num_inputs = \
+                preprocessing(zonal_test_dataset[zone][:, 1:], num_dims, num_input_markers,
                               num_zonal_markers, incl_p_invars, incl_tke_invars,
                               incl_input_markers, incl_zonal_markers, rho, incl_RANS_k)
+            y_test = zonal_test_dataset[zone][:, 0]
 
             user_vars = locals()
             current_folder = \
@@ -132,7 +136,8 @@ def tkenn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=
                               af_params, init_lr, lr_scheduler, lr_scheduler_params,
                               weight_init, weight_init_params, max_epochs, min_epochs,
                               interval, avg_interval, loss, optimizer, batch_size,
-                              folder_path, user_vars, print_freq, num_inputs)
+                              folder_path, user_vars, print_freq, num_inputs,
+                              zonal_test_case_tags, zonal_test_output_normzr, zone)
     else:
         raise Exception("Invalid version")
 

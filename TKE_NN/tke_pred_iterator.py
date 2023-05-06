@@ -3,7 +3,7 @@ from TBNN import calculator, preprocessor, pred_iterator, results_writer
 from tke_core import tkenn_ops
 from tke_preprocessor import calc_output, split_database
 from tke_results_writer import write_param_txt, write_param_csv, write_test_truth_logk, \
-    write_k_results
+    write_k_results, write_k_results_v2
 
 
 def preprocessing(database, num_dims, num_input_markers, num_zonal_markers, incl_p_invars,
@@ -91,7 +91,8 @@ def trial_iter_v2(num_seeds, x_train, y_train, x_valid, y_valid, coords_test, x_
                   y_test, num_hid_layers, num_hid_nodes, af, af_params, init_lr,
                   lr_scheduler, lr_scheduler_params, weight_init, weight_init_params,
                   max_epochs, min_epochs, interval, avg_interval, loss, optimizer,
-                  batch_size, folder_path, user_vars, print_freq, num_inputs):
+                  batch_size, folder_path, user_vars, print_freq, num_inputs,
+                  test_case_tags, test_output_normzr, zone):
 
     # Loop the following for each instance (seed) of TKENN:
     for seed in range(1, num_seeds + 1):
@@ -114,7 +115,8 @@ def trial_iter_v2(num_seeds, x_train, y_train, x_valid, y_valid, coords_test, x_
                       interval, avg_interval, print_freq, log, num_inputs)  # ✓
 
         # Write results for each seed ✓
-        write_k_results(coords_test, folder_path, seed, y_pred, current_folder)  # ✓
+        write_k_results_v2(coords_test, folder_path, seed, y_pred, current_folder,
+                           test_case_tags, test_output_normzr, zone)  # ✓
         final_train_rmse_list.append(final_train_rmse)
         final_valid_rmse_list.append(final_valid_rmse)
         test_rmse_list.append(test_rmse)
