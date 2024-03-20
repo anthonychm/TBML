@@ -78,7 +78,7 @@ def load_data(database, num_dims, num_input_markers, num_zonal_markers, pressure
 
 
 def scalar_basis_manager(data_processor, k, eps, grad_u, rho, u, grad_p, grad_k,
-                         incl_p_invars, incl_tke_invars):  # ✓
+                         two_invars, incl_p_invars, incl_tke_invars):  # ✓
 
     Sij, Rij = data_processor.calc_Sij_Rij(grad_u, k, eps)  # ✓
     # Mean strain rate tensor Sij = (k/eps)*sij, mean rotation rate tensor (k/eps)*rij
@@ -88,7 +88,11 @@ def scalar_basis_manager(data_processor, k, eps, grad_u, rho, u, grad_p, grad_k,
     if incl_tke_invars is True:
         Ak = data_processor.calc_Ak(grad_k, eps, k)  # ✓
 
-    if incl_p_invars is False and incl_tke_invars is False:
+    if two_invars is True:
+        x = data_processor.calc_scalar_basis(Sij, Rij, pressure=False, tke=False,
+                                             two_invars=True)
+        assert x.shape[1] == 2, "Incorrect number of columns"
+    elif incl_p_invars is False and incl_tke_invars is False:
         x = data_processor.calc_scalar_basis(Sij, Rij, pressure=False, tke=False)  # ✓
         assert x.shape[1] == 5, "Incorrect number of columns"
     elif incl_p_invars is True and incl_tke_invars is False:

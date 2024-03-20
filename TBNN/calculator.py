@@ -11,13 +11,15 @@ class PopeDataProcessor:
         self.std = None
 
     @staticmethod
-    def calc_Sij_Rij(grad_u, k, eps, cap=7., normalize=False, nondim=True):  # ✓
+    def calc_Sij_Rij(grad_u, k, eps, cap_val=7., cap=False, normalize=False, nondim=True):
+        # ✓
         """
         Calculates the non-dimensional mean strain rate and rotation rate tensors.
         :param grad_u: num_points X 3 X 3
         :param k: turbulent kinetic energy
         :param eps: turbulent kinetic energy dissipation rate
-        :param cap: This is the max magnitude that Sij or Rij components are allowed
+        :param cap_val: This is the max magnitude that Sij and Rij components are allowed
+        :param cap: Boolean for capping the max magnitude of the Sij and Rij components
         :param normalize: Boolean for normalizing Sij and Rij
         :param nondim: Boolean for non-dimensionalising Sij and Rij
         :return: Sij, Rij in the form of num_points X 3 X 3 tensors
@@ -41,15 +43,16 @@ class PopeDataProcessor:
                 Rij[i, :, :] = k_eps[i] * 0.5 * (grad_u[i, :, :] -
                                                  np.transpose(grad_u[i, :, :]))
 
-            Sij[Sij > cap] = cap
-            Sij[Sij < -cap] = -cap
-            Rij[Rij > cap] = cap
-            Rij[Rij < -cap] = -cap
+            if cap is True:
+                Sij[Sij > cap_val] = cap_val
+                Sij[Sij < -cap_val] = -cap_val
+                Rij[Rij > cap_val] = cap_val
+                Rij[Rij < -cap_val] = -cap_val
 
-            # Because we enforced limits on maximum Sij values, we need to re-enforce
-            # trace of 0
-            for i in range(num_points):
-                Sij[i, :, :] = Sij[i, :, :] - 1./3. * np.eye(3)*np.trace(Sij[i, :, :])
+                # Because we enforced limits on maximum Sij values, we need to re-enforce
+                # trace of 0
+                for i in range(num_points):
+                    Sij[i, :, :] = Sij[i, :, :] - 1./3. * np.eye(3)*np.trace(Sij[i, :, :])
 
         # Calculate normalized mean strain and rotation rate tensors
         # Sij = Sij/(|Sij|+|eps/k|), Rij = Rij/(2*|Rij|)
@@ -142,7 +145,8 @@ class PopeDataProcessor:
         return anti
 
     def calc_scalar_basis(self, Sij, Rij, Ap=None, Ak=None, pressure=True, tke=True,
-                          is_train=True, standardize=True, cap=2.0, load=False):  # ✓
+                          is_train=True, standardize=True, cap=2.0, load=False,
+                          two_invars=True):  # ✓
 
         """
         Given Sij, Rij, Ap* and Ak*, this function returns a set of normalized scalar
@@ -169,7 +173,9 @@ class PopeDataProcessor:
             # Number of invariants = 19 if only one of pressure or tke is True ✓
             num_points = Sij.shape[0]
             num_invar = 19
-            if pressure is False and tke is False:
+            if two_invars is True:
+                num_invar = 2
+            elif pressure is False and tke is False:
                 num_invar = 5
             elif pressure is True and tke is True:
                 num_invar = 47
@@ -201,8 +207,11 @@ class PopeDataProcessor:
                 rij = Rij[i, :, :]
 
                 # Invariants of Sij and Rij ✓
-                invars[i, 0] = tr(dot(sij, sij)) #196
+                invars[i, 0] = tr(dot(sij, sij))
                 invars[i, 1] = tr(dot(rij, rij))
+                if two_invars is True:
+                    continue
+
                 invars[i, 2] = tr(mdot([sij, sij, sij]))
                 invars[i, 3] = tr(mdot([rij, rij, sij]))
                 invars[i, 4] = tr(mdot([rij, rij, sij, sij]))
@@ -273,7 +282,7 @@ class PopeDataProcessor:
         return invars
 
     @staticmethod
-    def calc_tensor_basis(Sij, Rij, num_tensor_basis=10, is_scale=True):  # ✓
+    def calc_tensor_basis(Sij, Rij, num_tensor_basis, is_scale=True):  # ✓
         """
         Given Sij and Rij, this calculates the tensor basis
         :param Sij: normalized strain rate tensor
@@ -338,8 +347,15 @@ class PopeDataProcessor:
                             - np.dot(np.dot(rij, np.dot(rij, sij)), np.dot(sij, rij))
             return T
 
+        if num_tensor_basis == 3:
+            tb_funcs = [t1, t2, t3]
+        elif num_tensor_basis == 10:
+            tb_funcs = [t1, t2, t3, t4, t5, t6, t7, t8, t9, t10]
+        else:
+            raise Exception('Invalid number of tensor bases')
+
         tensor_basis_dict = {}
-        for j, t in enumerate([t1, t2, t3, t4, t5, t6, t7, t8, t9, t10]):
+        for j, t in enumerate(tb_funcs):
             tensor_basis_dict[j] = t
 
         for i in range(num_points):

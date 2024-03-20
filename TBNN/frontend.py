@@ -42,8 +42,8 @@ def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0
     num_hid_layers = 5  # Number of hidden layers in the TBNN, default = 3
     num_hid_nodes = [20] * num_hid_layers  # Number of nodes in the hidden layers given
     # as a vector, default = [5, 5, 5]
-    num_tensor_basis = 10  # Number of tensor bases for bij prediction, also the num of
-    # output nodes, default = 10
+    num_tensor_basis = 3  # Number of tensor bases for bij prediction, also the num of
+    # output nodes. For 2D = 3, for 3D = 10
     max_epochs = 100000  # Max number of training epochs, default = 2000
     min_epochs = 100  # Min number of training epochs, default = 1000
     interval = 4  # Frequency of epochs at which the model is evaluated on validation
@@ -72,11 +72,12 @@ def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0
     batch_size = 32  # Training batch size, default = 16
 
     # Define TBNN inputs
+    two_invars = True  # Only include the first two invariants tr(S²) and tr(R²)
     incl_p_invars = False  # Include pressure invariants in inputs
     incl_tke_invars = False  # Include tke invariants in inputs
     incl_input_markers = False  # Include scalar markers in inputs
     num_input_markers = None  # Number of scalar markers in inputs
-    rho = 1.514  # Density of air at -40C with nu = 1e-5 m^2/s
+    rho = 1.514  # Density of air at -40C with nu = 1e-5 m²/s
 
     # Define splitting of training, validation and testing datasets
     train_test_rand_split = False  # Randomly split entire database for training and
@@ -107,7 +108,7 @@ def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0
     if version == "v1":
         coords, x, tb, y, num_inputs = \
             preprocessing(database, num_dims, num_input_markers, num_zonal_markers,
-                          incl_p_invars, incl_tke_invars, incl_input_markers,
+                          two_invars, incl_p_invars, incl_tke_invars, incl_input_markers,
                           incl_zonal_markers, rho, num_tensor_basis, enforce_realiz,
                           num_realiz_its)  # ✓
         user_vars = locals()
@@ -125,19 +126,19 @@ def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0
         for zone in zones:
             coords_train, x_train, tb_train, y_train, num_inputs = \
                 preprocessing(zonal_train_dataset[zone][:, 1:], num_dims, num_input_markers,
-                              num_zonal_markers, incl_p_invars, incl_tke_invars,
+                              num_zonal_markers, two_invars, incl_p_invars, incl_tke_invars,
                               incl_input_markers, incl_zonal_markers, rho,
                               num_tensor_basis, enforce_realiz, num_realiz_its)  #
 
             coords_valid, x_valid, tb_valid, y_valid, num_inputs = \
                 preprocessing(zonal_valid_dataset[zone][:, 1:], num_dims, num_input_markers,
-                              num_zonal_markers, incl_p_invars, incl_tke_invars,
+                              num_zonal_markers, two_invars, incl_p_invars, incl_tke_invars,
                               incl_input_markers, incl_zonal_markers, rho,
                               num_tensor_basis, enforce_realiz, num_realiz_its)  #
 
             coords_test, x_test, tb_test, y_test, num_inputs = \
                 preprocessing(zonal_test_dataset[zone][:, 1:], num_dims, num_input_markers,
-                              num_zonal_markers, incl_p_invars, incl_tke_invars,
+                              num_zonal_markers, two_invars, incl_p_invars, incl_tke_invars,
                               incl_input_markers, incl_zonal_markers, rho,
                               num_tensor_basis, enforce_realiz, num_realiz_its)  #
 

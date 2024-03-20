@@ -10,9 +10,9 @@ import numpy as np
 import random
 
 
-def preprocessing(database, num_dims, num_input_markers, num_zonal_markers, incl_p_invars,
-                  incl_tke_invars, incl_input_markers, incl_zonal_markers, rho,
-                  num_tensor_basis, enforce_realiz, num_realiz_its):  # ✓
+def preprocessing(database, num_dims, num_input_markers, num_zonal_markers, two_invars,
+                  incl_p_invars, incl_tke_invars, incl_input_markers, incl_zonal_markers,
+                  rho, num_tensor_basis, enforce_realiz, num_realiz_its):  # ✓
     """
     Preprocesses the CFD data:
     - Load and separate data using load_data
@@ -49,7 +49,7 @@ def preprocessing(database, num_dims, num_input_markers, num_zonal_markers, incl
     # Calculate inputs and outputs ✓
     data_processor = PopeDataProcessor()
     Sij, Rij, x = scalar_basis_manager(data_processor, k, eps, grad_u, rho, u, grad_p,
-                                       grad_k, incl_p_invars, incl_tke_invars)  # ✓
+                                       grad_k, two_invars, incl_p_invars, incl_tke_invars)  # ✓
     if incl_input_markers is True:
         x = np.concatenate((x, input_markers), axis=1)
     num_inputs = x.shape[1]
