@@ -47,3 +47,10 @@ A mapping analyser tool based on unsupervised clustering was developed to assess
 Man, A., Jadidi, M., Keshmiri, A., Yin, H. & Mahmoudi, Y. (2024) Non-unique machine learning mapping in data-driven Reynolds averaged turbulence models. *Physics of Fluids* **36**, accepted/in press.
 
 Preprint: https://arxiv.org/abs/2312.13005
+
+## Acknowledgements
+The authors would like to acknowledge the assistance given by Research IT and the use of the Computational Shared Facility High Performance Cluster at The University of Manchester.
+
+## Help
+If you encounter problems, feel free to open an issue. You may also email me at anthony.man@manchester.ac.uk.
+If you find this package useful, please consider citing our work.
