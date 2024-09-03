@@ -9,12 +9,19 @@ The TBML package is a collection of machine learning frameworks for predicting t
 
 ## Installation
 This package was developed with Python 3.10 and the following libraries:
-- numpy 1.22
-- torch 1.13
-- pandas 1.4
-- scikit-learn 1.2
-- matplotlib 3.7
-- seaborn 0.12
+- numpy 1.22.0
+- torch 1.13.0
+- pandas 1.4.0
+- scikit-learn 1.2.0
+- matplotlib 3.7.0
+- seaborn 0.12.0
+
+To install:
+```python
+git clone https://github.com/AnthonyCHM/TBML.git
+cd TBML
+python setup.py install
+```
 
 ## Frameworks
 TBML currently contains four frameworks: tensor basis neural network (TBNN), turbulent kinetic energy neural network (TKENN), zonal neural networks and tensor basis mixture density network (TBmix).
