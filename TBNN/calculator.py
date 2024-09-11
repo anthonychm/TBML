@@ -380,31 +380,32 @@ class PopeDataProcessor:
         return T_flat
 
     @staticmethod
-    def calc_output(tauij):  # ✓
+    def calc_true_output(tauij, output_var="bij"):
         """
         Given Reynolds stress tensor (num_points X 3 X 3), return flattened
-        non-dimensional anisotropy tensor
+        non-dimensional output tensor to use as true values.
         :param tauij: Reynolds stress tensor
-        :return: anisotropy_flat in the form (num_points X 9) anisotropy tensor.
-        bij = (uiuj)/2k - 1./3. * delta_ij
+        :param output_var: true output variable name
+        :return: flat non-dimensional true output tensor in the form (num_points X 9)
         """
+
+        assert output_var in ["nd_tauij", "bij"]
         num_points = tauij.shape[0]
-        bij = np.zeros((num_points, 3, 3))
+        output = np.full((num_points, 9), np.nan)
+        tke = 0.5 * (tauij[:, 0, 0] + tauij[:, 1, 1] + tauij[:, 2, 2])
+        tke = np.maximum(tke, 1e-8)
 
-        # Calculate bij array ✓
+        # Populate flattened output array
         for i in range(3):
             for j in range(3):
-                tke = 0.5 * (tauij[:, 0, 0] + tauij[:, 1, 1] + tauij[:, 2, 2])
-                tke = np.maximum(tke, 1e-8)
-                bij[:, i, j] = tauij[:, i, j]/(2.0 * tke)
-            bij[:, i, i] -= 1./3.
+                output[:, (3*i)+j] = tauij[:, i, j]/(2 * tke)
 
-        # Convert bij array to bij_flat ✓
-        bij_flat = np.zeros((num_points, 9))
-        for i in range(3):
-            for j in range(3):
-                bij_flat[:, (3*i)+j] = bij[:, i, j]
-        return bij_flat
+        # Return non-dimensional deviatoric tensor if output is anisotropy bij
+        if output_var == "bij":
+            for col in [0, 4, 8]:
+                output[:, col] -= 1/3
+
+        return output
 
     @staticmethod
     def calc_rans_anisotropy(grad_u, tke, eps):
