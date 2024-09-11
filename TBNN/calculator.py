@@ -146,7 +146,7 @@ class PopeDataProcessor:
 
     def calc_scalar_basis(self, Sij, Rij, Ap=None, Ak=None, pressure=True, tke=True,
                           is_train=True, standardize=True, cap=2.0, load=False,
-                          two_invars=True):  # ✓
+                          two_invars=False):  # ✓
 
         """
         Given Sij, Rij, Ap* and Ak*, this function returns a set of normalized scalar
