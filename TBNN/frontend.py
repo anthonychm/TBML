@@ -37,39 +37,28 @@ from results_writer import write_time, create_parent_folders
 
 def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0,
               zones=np.nan, zonal_train_dataset=np.nan, zonal_valid_dataset=np.nan,
-              zonal_test_dataset=np.nan, version="v1"):
+              zonal_test_dataset=np.nan, version="non_zonal"):
     # Define parameters
-    num_hid_layers = 5  # Number of hidden layers in the TBNN, default = 3
-    num_hid_nodes = [20] * num_hid_layers  # Number of nodes in the hidden layers given
-    # as a vector, default = [5, 5, 5]
-    num_tensor_basis = 3  # Number of tensor bases for bij prediction, also the num of
-    # output nodes. For 2D = 3, for 3D = 10
-    max_epochs = 100000  # Max number of training epochs, default = 2000
-    min_epochs = 100  # Min number of training epochs, default = 1000
-    interval = 4  # Frequency of epochs at which the model is evaluated on validation
-    # dataset, default = 100
-    avg_interval = 3  # Number of intervals averaged over for early stopping criteria,
-    # default = 4
-    enforce_realiz = True  # Boolean for enforcing realizability on Reynolds stresses,
-    # default = True
-    num_realiz_its = 5  # Number of iterations for realizability enforcing, default = 5
+    num_hid_layers = 3  # Num. of hidden layers, d = 3
+    num_hid_nodes = [10] * num_hid_layers  # Num. of hidden nodes, d = [5, 5, 5]
+    max_epochs = 2000  # Max num. of epochs, d = 2000
+    min_epochs = 15  # Min num. of epochs, d = 1000
+    interval = 2  # Model undertakes validation after every interval of epochs, d = 100
+    avg_interval = 3  # Num. of intervals averaged over for early stopping, d = 4
+    enforce_realiz = True  # Enforce realizability on Reynolds stresses, d = True
+    num_realiz_its = 5  # Num. of iterations for realizability enforcing, d = 5
 
     # Define advanced parameters
-    af = ["SiLU"] * num_hid_layers  # Nonlinear activation function, default =
-    # ["ELU"]*(num_hid_layers)
-    af_params = ["inplace=False"] * num_hid_layers  # Parameters of the nonlinear
-    # activation function, default = ["alpha=1.0, inplace=False"]*(num_hid_layers)
-    weight_init = "kaiming_normal_"  # Weight initialiser algorithm,
-    # default = "kaiming_normal_"
-    weight_init_params = "nonlinearity=leaky_relu"  # Arguments of the weight initialiser
-    # algorithm, default = "nonlinearity=leaky_relu"
-    init_lr = 0.01  # Initial learning rate, default = 0.01
-    lr_scheduler = "ExponentialLR"  # Learning rate scheduler, default = ExponentialLR
-    lr_scheduler_params = "gamma=0.95"  # Parameters of learning rate scheduler,
-    # default = "gamma=0.9"
-    loss = "MSELoss"  # Loss function, default = "MSELoss"
-    optimizer = "Adam"  # Optimizer algorithm, default = "Adam"
-    batch_size = 32  # Training batch size, default = 16
+    af = ["ReLU"] * num_hid_layers  # Activation functions, d = ["ELU"]*(num_hid_layers)
+    af_params = None  # Activation function parameters, d = None
+    weight_init = "kaiming_normal_"  # Weight initialiser, d = "kaiming_normal_"
+    weight_init_params = "nonlinearity=leaky_relu"  # Weight initialiser params, d = "nonlinearity=leaky_relu"
+    init_lr = 0.001  # Initial learning rate, d = 0.01
+    lr_scheduler = "ExponentialLR"  # Learning rate scheduler, d = "ExponentialLR"
+    lr_scheduler_params = "gamma=1"  # Learning rate scheduler params, d = "gamma=0.9"
+    loss = "MSELoss"  # Loss function, d = "MSELoss"
+    optimizer = "Adam"  # Optimizer, d = "Adam"
+    batch_size = 32  # Batch size, d = 16
 
     # Define TBNN inputs
     two_invars = True  # Only include the first two invariants tr(S²) and tr(R²)
@@ -78,34 +67,35 @@ def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0
     incl_input_markers = False  # Include scalar markers in inputs
     num_input_markers = None  # Number of scalar markers in inputs
     rho = 1.514  # Density of air at -40C with nu = 1e-5 m²/s
+    num_tensor_basis = 3  # Num. of tensor bases; for 2D flow = 3, for 3D flow = 10
 
     # Define splitting of training, validation and testing datasets
     train_test_rand_split = False  # Randomly split entire database for training and
-    # testing, default = False
+    # testing, d = False
     train_test_split_frac = None  # Fraction of entire database used for training and
-    # validation if train_test_rand_split = True, default = 0
+    # validation if train_test_rand_split = True, d = 0
     train_valid_rand_split = False  # Randomly split training database for training and
-    # validation, default = False
+    # validation, d = False
     train_valid_split_frac = None  # Fraction of training database used for actual
     # training while the other fraction is used for validation if
-    # train_valid_rand_split = True, default = 0.
+    # train_valid_rand_split = True, d = 0.
 
     # Set case lists if train_test_rand_split and train_valid_rand_split = False
-    train_list = [1, 3]
-    valid_list = [2.5]
-    test_list = [2, 4]
+    train_list = [1.5]
+    valid_list = [1]
+    test_list = [1.2]
 
     # Other
-    num_dims = 2  # Number of dimensions in dataset
-    num_seeds = 1  # Number of reproducible TBNN predictions to save
-    print_freq = 4  # Console print frequency
+    num_dims = 2  # Num. of dimensions in dataset
+    num_seeds = 1  # Num. of reproducible TBNN predictions to save
+    print_freq = 1  # Print frequency to console
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
     folder_path = create_parent_folders()
     start = timeit.default_timer()
 
-    if version == "v1":
+    if version == "non_zonal":
         coords, x, tb, y, num_inputs = \
             preprocessing(database, num_dims, num_input_markers, num_zonal_markers,
                           two_invars, incl_p_invars, incl_tke_invars, incl_input_markers,
@@ -122,7 +112,7 @@ def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0
                        enforce_realiz, num_realiz_its, folder_path, user_vars, print_freq,
                        case_dict, num_inputs)  # ✓
 
-    elif version == "v2":
+    elif version == "zonal":
         for zone in zones:
             coords_train, x_train, tb_train, y_train, num_inputs = \
                 preprocessing(zonal_train_dataset[zone][:, 1:], num_dims, num_input_markers,
@@ -162,7 +152,7 @@ def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0
 if __name__ == "__main__":
 
     # Load database and associated dictionary ✓
-    database_name = "FBFS5_full_set_no_walls.txt"  # Data source
+    database_name = "PHLL4_dataset.txt"  # Data source
     db2case = case_dicts.case_dict_names()
     case_dict, _, num_skip_rows = db2case[database_name]  # ✓
     database = np.loadtxt(database_name, skiprows=num_skip_rows)
