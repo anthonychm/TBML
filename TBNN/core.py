@@ -33,6 +33,8 @@ class DataLoader:
                                                  shuffle=False, num_workers=0)
         self.test_loader = torchdata.DataLoader(test_dataset, batch_size=batch_size,
                                                 shuffle=False, num_workers=0)
+        # Note: While validation and testing do not require batches, they are still used
+        # to reduce memory requirements
 
         def print_batch(loader, dataset_type):  # ✓
             print("First batch of ", dataset_type, "dataset:")
@@ -76,8 +78,11 @@ class NetworkStructure:
         self.af = af  # Activation functions
 
         # Create activation function arguments pandas dataframe
-        af_df = pd.Series(af_params)
-        self.af_df = af_df.str.split(pat=", ")
+        if af_params is not None:
+            af_df = pd.Series(af_params)
+            self.af_df = af_df.str.split(pat=", ")
+        else:
+            self.af_df = None
 
     def check_structure(self):  # ✓
         # Check that the number of hidden nodes, activation functions and their
@@ -86,8 +91,9 @@ class NetworkStructure:
             "Mismatch between the length of num_hid_nodes and value of num_hid_layers"
         assert len(self.af) == self.num_hid_layers, \
             "Mismatch between the length of af and value of num_hid_layers"
-        assert len(self.af_df) == self.num_hid_layers, \
-            "Mismatch between the length of af_params and value of num_hid_layers"
+        if self.af_df is not None:
+            assert len(self.af_df) == self.num_hid_layers, \
+                "Mismatch between the length of af_params and value of num_hid_layers"
 
 
 class Tbnn(nn.Module):
@@ -124,15 +130,24 @@ class Tbnn(nn.Module):
         layer = 0
         self.net.add_module("layer1", nn.Linear(self.structure.num_inputs,
                                                 self.structure.num_hid_nodes[layer]))
-        af_param_dict = retrieve_af_params(self.structure.af_df, layer)  # ✓
-        self.net.add_module("af1", getattr(nn, self.structure.af[layer])(**af_param_dict))
+        if self.structure.af_df is None:
+            self.net.add_module("af1", getattr(nn, self.structure.af[layer])())
+        else:
+            af_param_dict = retrieve_af_params(self.structure.af_df, layer)  # ✓
+            self.net.add_module("af1",
+                                getattr(nn, self.structure.af[layer])(**af_param_dict))
+
         for layer in range(1, self.structure.num_hid_layers):
             self.net.add_module("layer"+str(layer+1),
                                 nn.Linear(self.structure.num_hid_nodes[layer-1],
                                           self.structure.num_hid_nodes[layer]))
-            af_param_dict = retrieve_af_params(self.structure.af_df, layer)  # ✓
-            self.net.add_module("af" + str(layer+1),
-                                getattr(nn, self.structure.af[layer])(**af_param_dict))
+            if self.structure.af_df is None:
+                self.net.add_module("af" + str(layer+1),
+                                    getattr(nn, self.structure.af[layer])())
+            else:
+                af_param_dict = retrieve_af_params(self.structure.af_df, layer)  # ✓
+                self.net.add_module("af" + str(layer+1),
+                                    getattr(nn, self.structure.af[layer])(**af_param_dict))
         self.net.add_module("coeffs_layer", nn.Linear(self.structure.num_hid_nodes[-1],
                                                       self.structure.num_tensor_basis))
         print("Building of NN complete")
@@ -221,14 +236,16 @@ class TbnnTVT:
         continue_train = True
 
         # Training loop ✓
-        print("Epoch    Average training RMSE per data point per bij comp    "
-              "Average validation RMSE per data point per bij comp")
         while continue_train:
             epoch_count += 1
             model.train()
-            epoch_count, avg_train_loss = \
-                self.train_one_epoch(train_loader, self.criterion, self.optimizer,
-                                     device, model, epoch_count)  # ✓
+            avg_train_loss = self.train_one_epoch(train_loader, self.criterion,
+                                                  self.optimizer, device, model)  # ✓
+
+            # Print average training rmse per data point per bij comp
+            if epoch_count % self.print_freq == 0:
+                print(f"Epoch = {epoch_count}, Average training rmse per data point per "
+                      f"bij component = {np.sqrt(avg_train_loss)}")
 
             # Predict on validation data for early stopping ✓
             if epoch_count % self.interval == 0:
@@ -237,17 +254,20 @@ class TbnnTVT:
                 valid_loss_list.append(avg_valid_loss)
                 continue_train = self.check_conv(valid_loss_list, self.min_epochs,
                                                  self.avg_interval, epoch_count)  # ✓
+
+                # Print average validation rmse per data point per bij comp
+                print("------------------------------------------------------------")
+                print(f"Epoch = {epoch_count}, Average validation rmse per data point "
+                      f"per bij component = {np.sqrt(avg_valid_loss)}")
+                print("------------------------------------------------------------")
+
                 if continue_train is False:
                     break
 
             # The check_conv method ensures number of epochs is > min epochs
             # The if statement below ensures number of epochs is < max epochs ✓
-            if epoch_count > self.max_epochs:
+            if epoch_count == self.max_epochs:
                 break
-
-            # Print average training and validation RMSEs per data point in console ✓
-            if epoch_count % self.print_freq == 0:
-                print(epoch_count, np.sqrt(avg_train_loss), np.sqrt(avg_valid_loss))
 
             # Update learning rate
             self.lr_scheduler.step()
@@ -260,8 +280,7 @@ class TbnnTVT:
 
         return epoch_count, final_train_rmse, final_valid_rmse
 
-    def train_one_epoch(self, train_loader, criterion, optimizer, device, model,
-                        epoch_count):  # ✓
+    def train_one_epoch(self, train_loader, criterion, optimizer, device, model):  # ✓
         running_train_loss = 0
 
         for i, (x, tb, y) in enumerate(train_loader):
@@ -283,7 +302,7 @@ class TbnnTVT:
         # Calculate average loss per data point per bij comp
         avg_train_loss = running_train_loss / len(train_loader)
 
-        return epoch_count, avg_train_loss
+        return avg_train_loss
 
     def perform_valid(self, valid_loader, device, model, criterion):  # ✓
         # Predict on validation data
