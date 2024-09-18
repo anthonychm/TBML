@@ -1,13 +1,11 @@
-import sys
-sys.path.insert(1, "../TBNN")
-
+import TBNN as tbnn
 import numpy as np
 import math
 from scipy.spatial import Voronoi
 import torch
 import torch.nn as nn
-from TBNN import core_plotter
-from TBNN.calculator import PopeDataProcessor
+import sys
+sys.path.append('../TBNN')
 
 
 class TBMix(nn.Module):
@@ -105,7 +103,8 @@ class TBMix(nn.Module):
         mu_g1 = self.z_mu_g1(z_h)  # Tensor (batch size, num kernels)
         mu_g2 = self.z_mu_g2(z_h)  # Tensor (batch size, num kernels)
         mu_g3 = self.z_mu_g3(z_h)  # Tensor (batch size, num kernels)
-        sigma = torch.exp(self.z_sigma(z_h))  # Tensor (batch size, num kernels)
+        # sigma = torch.exp(self.z_sigma(z_h))  # Tensor (batch size, num kernels)
+        sigma = nn.ELU()(self.z_sigma(z_h)) + 1 + 1e-15
 
         # Rewrite mean g coefficients in (num kernels, batch size, num coefficients) form
         g_coeffs = torch.full((self.num_kernels, x.shape[0], 3), torch.nan)
@@ -140,7 +139,8 @@ class TBMix(nn.Module):
                 mu_bij = torch.matmul(g_coeffs[k, data_point, :], tb[data_point].float())
 
                 # mu_bij_batch[k, data_point, :] = mu_bij
-                mu_bij_batch[k, data_point, :] = sig_clip(mu_bij)
+                mu_bij_batch[k, data_point, :] = torch.tanh(mu_bij)
+                # mu_bij_batch[k, data_point, :] = sig_clip(mu_bij)
 
         # Multiply std dev by three as bij has three terms, each with std dev = sigma
         sigma = 3*sigma
@@ -226,9 +226,9 @@ class TBMixTVT:
                               valid_loss_list[-1])  # ✓
 
         # Plot maximum validation pi and loss curves
-        core_plotter.plot_scalar(epoch_count, max_valid_pi_list, self.interval, "Max pi")
-        core_plotter.plot_loss_curves(epoch_count, train_loss_list, valid_loss_list,
-                                      self.interval)
+        tbnn.plot.plot_scalar(epoch_count, max_valid_pi_list, self.interval, "Max pi")
+        tbnn.plot.plot_loss_curves(epoch_count, train_loss_list, valid_loss_list,
+                                   self.interval)
 
         return epoch_count, train_loss_list, valid_loss_list
 
@@ -252,7 +252,6 @@ class TBMixTVT:
                 continue
 
             # Clip (i.e., clamp) sigma to avoid infinite loss
-            # Keep clamp sigma but choose 3 points with highest pi for anchoring
             # sigma = torch.clamp(sigma, min=1e-50)
 
             # Calculate and check total NLL loss for current batch
@@ -284,7 +283,7 @@ class TBMixTVT:
         # Return average NLL loss per data point per bij component for each epoch
         return running_train_loss / (num_points * 9)
 
-    def nll_loss(self, pi, mu_bij_batch, sigma, y, model, reg=None):
+    def nll_loss(self, pi, mu_bij_batch, sigma, y, model, log=True, reg=None):
         # Make y, sigma, and pi have same dimensions as mu_bij_batch
         y = y.unsqueeze(0).repeat(self.num_kernels, 1, 1)
         sigma = torch.transpose(sigma, 0, 1).unsqueeze(2).repeat(1, 1, 9)
@@ -292,15 +291,26 @@ class TBMixTVT:
 
         # Calculate distribution difference
         diff = (y - mu_bij_batch) * torch.reciprocal(sigma)
-        diff = -0.5 * torch.square(diff)
-        frac = 1.0 / np.sqrt(2.0 * np.pi)
-        gauss_diff = frac * torch.reciprocal(sigma) * torch.exp(diff)
-        assert torch.all(gauss_diff >= 0).tolist() is True
+        diff = 0.5 * torch.square(diff)
 
-        # Calculate negative log-likelihood loss
-        nll_loss = torch.sum(pi * gauss_diff, dim=0)  # sum over kernels
-        nll_loss = torch.log(nll_loss)
-        nll_loss = -torch.sum(torch.sum(nll_loss, dim=0))  # sum over batch and bij comps
+        if log is True:
+            # Calculate loss in the log domain
+            log_gauss_diff = -torch.log(sigma) - (0.5*math.log(2*np.pi)) - diff
+            log_mix_prob = torch.log(pi)
+            nll_loss = torch.logsumexp(log_mix_prob + log_gauss_diff, dim=0)
+            nll_loss = -1 * torch.mean(nll_loss)
+        else:
+            # Calculate loss in standard manner
+            frac = 1.0 / np.sqrt(2.0 * np.pi)
+            gauss_diff = frac * torch.reciprocal(sigma) * torch.exp(-diff)
+            assert torch.all(gauss_diff >= 0).tolist() is True
+
+            # Calculate negative log-likelihood loss
+            nll_loss = torch.sum(pi * gauss_diff, dim=0)  # sum over kernels
+            nll_loss = -torch.log(nll_loss)
+            nll_loss = torch.mean(nll_loss)
+            # nll_loss = -torch.sum(torch.sum(nll_loss, dim=0))  # sum over batch and bij
+            # comps
 
         # Calculate L2 regularization and return combined loss, else return nll loss
         if reg == "l2":
@@ -379,6 +389,20 @@ class TBMixTVT:
             print("Final average validation NLL loss per data point per bij component = ",
                   final_avg_valid_loss, file=write_file)
 
+    def test_preprocessing(self, x_test, tb_test, y_test):
+        # Convert data from np.array to torch.tensor
+        x_test = torch.from_numpy(x_test)
+        tb_test = torch.from_numpy(tb_test)
+        y_test = torch.from_numpy(y_test)
+
+        # Predict on test dataset
+        pi_all = torch.full((len(x_test), self.num_kernels), torch.nan)
+        mu_bij_all = torch.full((self.num_kernels, len(x_test), 9), torch.nan)
+        sigma_all = torch.full((len(x_test), self.num_kernels), torch.nan)
+        mu_bij_pred = torch.full((len(x_test), 9), torch.nan)
+
+        return x_test, tb_test, y_test, pi_all, mu_bij_all, sigma_all, mu_bij_pred
+
     @staticmethod
     def find_test_neighbours(test_list, coords_test):
         # Find neighbouring data points in the flow domain using a Voronoi diagram
@@ -394,23 +418,55 @@ class TBMixTVT:
 
         return neigh_dict
 
-    def perform_test(self, x_test, tb_test, y_test, model, neigh_dict, enforce_realiz,
-                     num_realiz_its, log):  #
-        # Convert data from np.array to torch.tensor
-        x_test = torch.from_numpy(x_test)
-        tb_test = torch.from_numpy(tb_test)
-        y_test = torch.from_numpy(y_test)
+    def perform_most_prob_test(self, x_test, tb_test, y_test, model, pi_all, mu_bij_all,
+                               sigma_all, mu_bij_pred, enforce_realiz, num_realiz_its,
+                               log):
+        with torch.no_grad():
+            model.eval()
+            running_test_loss = 0
 
-        # Predict on test dataset
-        pi_all = torch.full((len(x_test), self.num_kernels), torch.nan)
-        mu_bij_all = torch.full((self.num_kernels, len(x_test), 9), torch.nan)
-        sigma_all = torch.full((len(x_test), self.num_kernels), torch.nan)
-        mu_bij_pred = torch.full((len(x_test), 9), torch.nan)
+            # Obtain all and most probable kernel predictions
+            for i in range(len(x_test)):
+                pi, mu_bij, sigma = model(torch.unsqueeze(x_test[i, :], 0),
+                                          torch.unsqueeze(tb_test[i, :, :], 0))  # ✓
+                pi_all[i, :] = pi
+                for k in range(self.num_kernels):
+                    mu_bij_all[k, i, :] = mu_bij[k, :, :]
+                sigma_all[i, :] = sigma
+                loss = self.nll_loss(pi, mu_bij, sigma, y_test[i, :], model) # ✓
+                running_test_loss += loss.item()
 
+                k = torch.argmax(pi).item()
+                mu_bij_pred[i, :] = mu_bij[k, :, :]
+
+        avg_nll_loss = running_test_loss / (len(x_test) * 9)
+        print(f"Max value of pi = {torch.max(pi_all).item()}")
+
+        # Convert mu_bij_pred to np array and enforce realizability
+        mu_bij_pred = mu_bij_pred.numpy()
+        y_test = y_test.numpy()
+
+        # if enforce_realiz:
+        #     for i in range(num_realiz_its):
+        #         mu_bij_pred = tbnn.calc.PopeDataProcessor.make_realizable(mu_bij_pred)
+
+        # Calculate, print and write testing RMSE
+        test_rmse = self.calc_test_rmse(mu_bij_pred, y_test, log)  # ✓
+
+        # Convert tensors to np arrays to view them
+        pi_all = pi_all.numpy()
+        mu_bij_all = mu_bij_all.numpy()
+        sigma_all = sigma_all.numpy()
+
+        return mu_bij_pred, avg_nll_loss, test_rmse, pi_all, mu_bij_all, sigma_all
+
+    def perform_anchors_test(self, x_test, tb_test, y_test, model, pi_all, mu_bij_all,
+                             sigma_all, mu_bij_pred, neigh_dict, enforce_realiz,
+                             num_realiz_its, log):  #
         with torch.no_grad():
             model.eval()
 
-            # First testing round: Find points that have pi = 1
+            # First testing round: Find points that have high pi
             running_test_loss = 0
             tf_list = [False] * len(x_test)
             for i in range(len(x_test)):
@@ -424,13 +480,13 @@ class TBMixTVT:
                 running_test_loss += loss.item()
 
                 for k, p in enumerate(torch.squeeze(pi)):
-                    if torch.floor(p + 0.01).item() == 1:
+                    if p.item() > 0.7:
                         assert torch.all(torch.isnan(mu_bij_pred[i, :])).item() is True
                         mu_bij_pred[i, :] = mu_bij[k, :, :]
                         tf_list[i] = True
 
         avg_nll_loss = running_test_loss / (len(x_test) * 9)
-        print(f"Max value of pi = {torch.max(pi).item()}")
+        print(f"Max value of pi = {torch.max(pi_all).item()}")
 
         # Second testing round: Find points near those from the previous testing round
         # and choose the closest bij prediction to the points that passed the previous
@@ -473,12 +529,17 @@ class TBMixTVT:
 
         # if enforce_realiz:
         #     for i in range(num_realiz_its):
-        #         mu_bij_pred = PopeDataProcessor.make_realizable(mu_bij_pred)
+        #         mu_bij_pred = tbnn.calc.PopeDataProcessor.make_realizable(mu_bij_pred)
 
         # Calculate, print and write testing RMSE
         test_rmse = self.calc_test_rmse(mu_bij_pred, y_test, log)  # ✓
 
-        return mu_bij_pred, avg_nll_loss, test_rmse
+        # Convert tensors to np arrays to view them
+        pi_all = pi_all.numpy()
+        mu_bij_all = mu_bij_all.numpy()
+        sigma_all = sigma_all.numpy()
+
+        return mu_bij_pred, avg_nll_loss, test_rmse, pi_all, mu_bij_all, sigma_all
 
     @staticmethod
     def calc_test_rmse(y_pred, y_test, log):  #
