@@ -3,6 +3,30 @@ import os.path
 import pandas as pd
 
 
+def write_all_mixture_results(coords_test, folder_path, seed, pi_all, mu_bij_all,
+                               sigma_all, current_folder):
+    # Write mixing coeffients to file
+    pi_all = np.hstack((coords_test, pi_all))
+    np.savetxt(os.path.join(folder_path, 'Trials', 'Trial ' + str(current_folder),
+                            'Trial' + str(current_folder) + '_seed' + str(seed) +
+                            '_mixing_coefficients.txt'), pi_all, delimiter=' ',
+               header="Cx Cy Mixing coefficients")
+
+    # Write mean anisotropy to file
+    for k in range(mu_bij_all.shape[0]):
+        arr = np.hstack((coords_test, mu_bij_all[k, :, :]))
+        np.savetxt(os.path.join(folder_path, 'Trials', 'Trial ' + str(current_folder),
+                                'Trial' + str(current_folder) + '_seed' + str(seed) +
+                                '_mu_bij_from_kernel_' + str(k+1) + '.txt'), arr,
+                   delimiter=' ', header="Cx Cy b11 b12 b13 b21 b22 b23 b31 b32 b33")
+
+    # Write sigma to file
+    sigma_all = np.hstack((coords_test, sigma_all))
+    np.savetxt(os.path.join(folder_path, 'Trials', 'Trial ' + str(current_folder),
+                            'Trial' + str(current_folder) + '_seed' + str(seed) +
+                            '_sigma.txt'), sigma_all, delimiter=' ', header="Cx Cy sigma")
+
+
 def write_trial_loss_csv(final_train_avg_nll_loss_list, final_valid_avg_nll_loss_list,
                          test_avg_nll_loss_list, test_rmse_list, folder_path,
                          current_folder):  #
