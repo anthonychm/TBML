@@ -10,7 +10,7 @@ def calc_output(tauij):  # ✓
     Calculates the logarithm to the base 10 of TKE to ensure that predicted TKE from
     the TKENN is positive.
     """
-    tke = 0.5 * (tauij[:, 0, 0] + tauij[:, 1, 1] + tauij[:, 2, 2])
+    tke = 0.5 * (tauij[:, 0] + tauij[:, 4] + tauij[:, 8])
     tke = np.maximum(tke, 1e-8)
     log_tke = np.log10(tke)
     log_tke = np.reshape(log_tke, (log_tke.shape[0], 1))

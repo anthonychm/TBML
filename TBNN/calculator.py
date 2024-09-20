@@ -380,9 +380,9 @@ class PopeDataProcessor:
         return T_flat
 
     @staticmethod
-    def calc_true_output(tauij, output_var="bij"):
+    def calc_true_output(tauij, output_var):
         """
-        Given Reynolds stress tensor (num_points X 3 X 3), return flattened
+        Given flattened Reynolds stress tensor (num_points X 9), return flattened
         non-dimensional output tensor to use as true values.
         :param tauij: Reynolds stress tensor
         :param output_var: true output variable name
@@ -392,13 +392,12 @@ class PopeDataProcessor:
         assert output_var in ["nd_tauij", "bij"]
         num_points = tauij.shape[0]
         output = np.full((num_points, 9), np.nan)
-        tke = 0.5 * (tauij[:, 0, 0] + tauij[:, 1, 1] + tauij[:, 2, 2])
+        tke = 0.5 * (tauij[:, 0] + tauij[:, 4] + tauij[:, 8])
         tke = np.maximum(tke, 1e-8)
 
         # Populate flattened output array
-        for i in range(3):
-            for j in range(3):
-                output[:, (3*i)+j] = tauij[:, i, j]/(2 * tke)
+        for col in range(8):
+            output[:, col] = tauij[:, col]/(2 * tke)
 
         # Return non-dimensional deviatoric tensor if output is anisotropy bij
         if output_var == "bij":

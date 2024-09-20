@@ -68,13 +68,11 @@ def load_data(database, num_dims, num_input_markers, num_zonal_markers, pressure
     # Reshape grad_u and stresses to num_points X 3 X 3 arrays ✓
     num_points = database.shape[0]
     grad_u = np.zeros((num_points, 3, 3))
-    tauij = np.zeros((num_points, 3, 3))
     for i in range(3):
         for j in range(3):
             grad_u[:, i, j] = grad_u_flat[:, (3*i)+j]
-            tauij[:, i, j] = tauij_flat[:, (3*i)+j]
 
-    return coords, k, eps, grad_u, grad_p, u, grad_k, input_markers, tauij
+    return coords, k, eps, grad_u, grad_p, u, grad_k, input_markers, tauij_flat
 
 
 def scalar_basis_manager(data_processor, k, eps, grad_u, rho, u, grad_p, grad_k,
