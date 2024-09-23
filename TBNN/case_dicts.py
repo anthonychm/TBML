@@ -1,26 +1,15 @@
-def case_dict_names():
-    database2case = {
-        "CHAN7_database.txt": chan7(),
-        "FBFS_full_set_no_walls.txt": fbfs3(),
-        "FBFS5_full_set_no_walls.txt": fbfs5(),
-        "FBFS5_IMPJ20000_dataset.txt": fbfs5_impj20000(),
-        "PHLL4_dataset.txt": phll4(),
-        "CHAN7_no_oti_half_database.txt": chan7_no_oti()
-    }
-    return database2case
+def get_metadata(dataset_name):
+    ref_dict = {"CHAN7_dataset.txt": chan7(),
+                "FBFS5_dataset.txt": fbfs5(),
+                "FBFS5_IMPJ20000_dataset.txt": fbfs5_impj20000(),
+                "PHLL4_dataset.txt": phll4(),
+                "CHAN7_no_oti_half_dataset.txt": chan7_no_oti()}
+    return ref_dict[dataset_name]
 
 
 def chan7():
     keys = [180, 290, 395, 490, 590, 760, 945]
     num_points = 182
-    case_dict = dict.fromkeys(keys, num_points)
-    num_skip_rows = 1
-    return case_dict, num_points, num_skip_rows
-
-
-def fbfs3():
-    keys = [1, 2, 4]
-    num_points = 80296
     case_dict = dict.fromkeys(keys, num_points)
     num_skip_rows = 1
     return case_dict, num_points, num_skip_rows
