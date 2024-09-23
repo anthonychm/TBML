@@ -396,7 +396,7 @@ class PopeDataProcessor:
         tke = np.maximum(tke, 1e-8)
 
         # Populate flattened output array
-        for col in range(8):
+        for col in range(9):
             output[:, col] = tauij[:, col]/(2 * tke)
 
         # Return non-dimensional deviatoric tensor if output is anisotropy bij
