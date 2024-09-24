@@ -10,10 +10,10 @@ import numpy as np
 import random
 
 
-def preprocessing(database, num_dims, num_input_markers, num_zonal_markers, two_invars,
+def preprocessing(dataset, num_dims, num_input_markers, num_zonal_markers, two_invars,
                   incl_p_invars, incl_tke_invars, incl_input_markers, incl_zonal_markers,
                   rho, num_tensor_basis, enforce_realiz, num_realiz_its,
-                  incl_nut_input=False):  # ✓
+                  incl_nut_input=True):  # ✓
     """
     Preprocesses the CFD data:
     - Load and separate data using load_data
@@ -23,7 +23,7 @@ def preprocessing(database, num_dims, num_input_markers, num_zonal_markers, two_
     - Calculate anisotropy bij for the LES/DNS/experimental data using calc_output
     - If enforce_realiz is True, enforce realizability in bij using make_realizable
 
-    :param database: Numpy array containing the full database
+    :param dataset: Numpy array containing the full database
     :param num_dims: Number of coordinate dimensions in database
     :param num_input_markers: Number of input scalar markers
     :param num_zonal_markers: Number of zonal boundary markers
@@ -42,7 +42,7 @@ def preprocessing(database, num_dims, num_input_markers, num_zonal_markers, two_
 
     # Load in data ✓
     coords, k, eps, grad_u, grad_p, u, grad_k, input_markers, tauij = \
-        load_data(database, num_dims, num_input_markers, num_zonal_markers,
+        load_data(dataset, num_dims, num_input_markers, num_zonal_markers,
                   incl_p_invars, incl_tke_invars, incl_input_markers,
                   incl_zonal_markers)  # ✓
     print("Data loading complete")
@@ -175,7 +175,7 @@ def tbnn_ops(x_train, tb_train, y_train, x_valid, tb_valid, y_valid, x_test, tb_
              weight_init, weight_init_params, loss, optimizer, init_lr, lr_scheduler,
              lr_scheduler_params, min_epochs, max_epochs, interval, avg_interval,
              print_freq, log, enforce_realiz, num_realiz_its, num_tensor_basis,
-             num_inputs):  # ✓
+             num_inputs, incl_t0_gen):  # ✓
 
     # Use GPU if possible
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -198,7 +198,7 @@ def tbnn_ops(x_train, tb_train, y_train, x_valid, tb_valid, y_valid, x_test, tb_
 
     # Construct TBNN and perform training, validation and testing ✓
     tbnn = Tbnn(device, seed, structure=structure, weight_init=weight_init,
-                weight_init_params=weight_init_params).double()  # ✓
+                weight_init_params=weight_init_params, incl_t0_gen=incl_t0_gen).double()  # ✓
     tbnn_tvt = TbnnTVT(loss, optimizer, init_lr, lr_scheduler, lr_scheduler_params,
                        min_epochs, max_epochs, interval, avg_interval, print_freq, log,
                        tbnn)  # ✓
@@ -216,7 +216,7 @@ def trial_iter(num_seeds, coords, x, tb, y, train_list, valid_list, test_list,
                af, af_params, init_lr, lr_scheduler, lr_scheduler_params, weight_init,
                weight_init_params, max_epochs, min_epochs, interval, avg_interval, loss,
                optimizer, batch_size, enforce_realiz, num_realiz_its, folder_path,
-               user_vars, print_freq, case_dict, num_inputs):  # ✓
+               user_vars, print_freq, case_dict, num_inputs, incl_t0_gen):  # ✓
     """
     After obtaining x, tb and y from preprocessing, run this function num_seeds times to
     train num_seeds TBNN instances and obtain num_seeds predictions:
@@ -256,7 +256,7 @@ def trial_iter(num_seeds, coords, x, tb, y, train_list, valid_list, test_list,
                      af_params, seed, weight_init, weight_init_params, loss, optimizer,
                      init_lr, lr_scheduler, lr_scheduler_params, min_epochs, max_epochs,
                      interval, avg_interval, print_freq, log, enforce_realiz,
-                     num_realiz_its, num_tensor_basis, num_inputs)  # ✓
+                     num_realiz_its, num_tensor_basis, num_inputs, incl_t0_gen)  # ✓
 
         # Write results for each seed ✓
         write_bij_results(coords_test, folder_path, seed, y_pred, current_folder)  # ✓

@@ -35,7 +35,7 @@ from pred_iterator import preprocessing, trial_iter, trial_iter_v2
 from results_writer import write_time, create_parent_folders
 
 
-def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0,
+def tbnn_main(dataset, case_dict, incl_zonal_markers=False, num_zonal_markers=0,
               zones=np.nan, zonal_train_dataset=np.nan, zonal_valid_dataset=np.nan,
               zonal_test_dataset=np.nan, version="non_zonal"):
     # Define parameters
@@ -67,7 +67,10 @@ def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0
     incl_input_markers = False  # Include scalar markers in inputs
     num_input_markers = None  # Number of scalar markers in inputs
     rho = 1.514  # Density of air at -40C with nu = 1e-5 m²/s
+
+    # Define TBNN outputs
     num_tensor_basis = 3  # Num. of tensor bases; for 2D flow = 3, for 3D flow = 10
+    incl_t0_gen = True  # Include generalised T0 from Cai et al. (2024)
 
     # Define splitting of training, validation and testing datasets
     train_test_rand_split = False  # Randomly split entire database for training and
@@ -97,7 +100,7 @@ def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0
 
     if version == "non_zonal":
         coords, x, tb, y, num_inputs = \
-            preprocessing(database, num_dims, num_input_markers, num_zonal_markers,
+            preprocessing(dataset, num_dims, num_input_markers, num_zonal_markers,
                           two_invars, incl_p_invars, incl_tke_invars, incl_input_markers,
                           incl_zonal_markers, rho, num_tensor_basis, enforce_realiz,
                           num_realiz_its)  # ✓
@@ -110,7 +113,7 @@ def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0
                        lr_scheduler_params, weight_init, weight_init_params, max_epochs,
                        min_epochs, interval, avg_interval, loss, optimizer, batch_size,
                        enforce_realiz, num_realiz_its, folder_path, user_vars, print_freq,
-                       case_dict, num_inputs)  # ✓
+                       case_dict, num_inputs, incl_t0_gen)  # ✓
 
     elif version == "zonal":
         for zone in zones:
@@ -150,15 +153,13 @@ def tbnn_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0
 
 
 if __name__ == "__main__":
-
-    # Load database and associated dictionary ✓
-    database_name = "PHLL4_dataset.txt"  # Data source
-    db2case = case_dicts.case_dict_names()
-    case_dict, _, num_skip_rows = db2case[database_name]  # ✓
-    database = np.loadtxt(database_name, skiprows=num_skip_rows)
+    # Load dataset and its case dictionary ✓
+    dataset_name = "PHLL4_dataset.txt"
+    case_dict, _, num_skip_rows = case_dicts.get_metadata(dataset_name)  # ✓
+    dataset = np.loadtxt("../Datasets/" + dataset_name, skiprows=num_skip_rows)
 
     # Run TBNN ✓
-    tbnn_main(database, case_dict)  # ✓
+    tbnn_main(dataset, case_dict)  # ✓
 
 
 
