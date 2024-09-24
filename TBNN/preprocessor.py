@@ -2,11 +2,11 @@ import random
 import numpy as np
 
 
-def load_data(database, num_dims, num_input_markers, num_zonal_markers, pressure_tf,
+def load_data(dataset, num_dims, num_input_markers, num_zonal_markers, pressure_tf,
               tke_tf, input_markers_tf, zonal_markers_tf):  # ✓
     """
     Load CFD data for TBNN calculations.
-    :param database: Numpy array containing the full database. The columns must be in the
+    :param dataset: Numpy array containing the full database. The columns must be in the
     following order: coordinates, tke, epsilon, velocity gradients, pressure gradients*,
     velocity*, tke gradients*, input markers*, zonal markers* and Reynolds stresses†.
 
@@ -34,39 +34,39 @@ def load_data(database, num_dims, num_input_markers, num_zonal_markers, pressure
     # Col     -(nz+9):-9     -9:
 
     # Define compulsory data ✓
-    coords = database[:, :num_dims]
-    k = database[:, num_dims]
-    eps = database[:, num_dims + 1]
-    grad_u_flat = database[:, num_dims + 2:num_dims + 11]
-    tauij_flat = database[:, -9:]
+    coords = dataset[:, :num_dims]
+    k = dataset[:, num_dims]
+    eps = dataset[:, num_dims + 1]
+    grad_u_flat = dataset[:, num_dims + 2:num_dims + 11]
+    tauij_flat = dataset[:, -9:]
 
     # Define grad_p data ✓
     if pressure_tf is True:
-        grad_p = database[:, num_dims + 11:num_dims + 14]
-        u = database[:, num_dims + 14:num_dims + 17]
+        grad_p = dataset[:, num_dims + 11:num_dims + 14]
+        u = dataset[:, num_dims + 14:num_dims + 17]
     else:
         grad_p = float("nan")
         u = float("nan")
 
     # Define grad_k data ✓
     if pressure_tf is False and tke_tf is True:
-        grad_k = database[:, num_dims + 11:num_dims + 14]
+        grad_k = dataset[:, num_dims + 11:num_dims + 14]
     elif pressure_tf is True and tke_tf is True:
-        grad_k = database[:, num_dims + 17:num_dims + 20]
+        grad_k = dataset[:, num_dims + 17:num_dims + 20]
     else:
         grad_k = float("nan")
 
     # Define input markers data [UNCHECKED]
     if input_markers_tf is True and zonal_markers_tf is False:
-        input_markers = database[:, -(num_input_markers+9):-9]
+        input_markers = dataset[:, -(num_input_markers+9):-9]
     elif input_markers_tf is True and zonal_markers_tf is True:
         input_markers = \
-            database[:, -(num_input_markers+num_zonal_markers+9):-(num_zonal_markers+9)]
+            dataset[:, -(num_input_markers+num_zonal_markers+9):-(num_zonal_markers+9)]
     else:
         input_markers = float("nan")
 
     # Reshape grad_u and stresses to num_points X 3 X 3 arrays ✓
-    num_points = database.shape[0]
+    num_points = dataset.shape[0]
     grad_u = np.zeros((num_points, 3, 3))
     for i in range(3):
         for j in range(3):
