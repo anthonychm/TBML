@@ -181,6 +181,17 @@ class Tbnn(nn.Module):
 
         self.net.apply(init_w_and_b)
         self.net = self.net.to(device)
+        self.z_coeffs.apply(init_w_and_b)
+        self.z_coeffs = self.z_coeffs.to(device)
+
+        if self.incl_t0_gen is True:
+            self.z_g01.apply(init_w_and_b)
+            self.z_g01 = self.z_g01.to(device)
+            self.z_g02.apply(init_w_and_b)
+            self.z_g02 = self.z_g02.to(device)
+            self.z_g03.apply(init_w_and_b)
+            self.z_g03 = self.z_g03.to(device)
+
         print("Weights and biases initialized")
 
     # Forward propagation
