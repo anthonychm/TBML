@@ -26,27 +26,31 @@ Reference for mixture density networks:
 Bishop, C.M., 1994. Mixture Density Networks. Technical report NCRG/94/004,
 Aston University, Birmingham, UK.
 
+Reference for generalised T0:
+Cai et al., 2024. Revisiting Tensor Basis Neural Network for Reynolds stress modeling:
+Application to plane channel and square duct flows. Computers and Fluids, 275, 106246.
+
 Checked 24/05/2024 [✓]
 Debugged 13/06/2024 [✓]
 """
 
-import TBNN as tbnn
 import tbmix_pred_iterator as tbmix_piter
 import numpy as np
 import timeit
 import sys
 sys.path.append('../TBNN')
 
+import TBNN as tbnn
 
-def tbmix_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=0):
+
+def tbmix_main(dataset, case_dict, incl_zonal_markers=False, num_zonal_markers=0):
     # Define parameters (d = default)
-    num_kernels = 3  # Num. of kernels
     num_hid_layers = 5  # Num. of hidden layers, d = 3
-    num_hid_nodes = [5, 10, 15, 20, 7]  # Num. of hidden nodes, d = [5, 5, 5]
+    num_hid_nodes = [20, 20, 20, 20, 20]  # Num. of hidden nodes, d = [5, 5, 5]
     max_epochs = 10000  # Max num. of epochs, d = 2000
-    min_epochs = 50  # Min num. of epochs, d = 1000
-    interval = 5  # Model undertakes validation after every interval of epochs, d = 100
-    avg_interval = 3  # Num. of intervals averaged over for early stopping, d = 4
+    min_epochs = 200  # Min num. of epochs, d = 1000
+    interval = 10  # Model undertakes validation after every interval of epochs, d = 100
+    avg_interval = 5  # Num. of intervals averaged over for early stopping, d = 4
     enforce_realiz = True  # Enforce realizability on Reynolds stresses, d = True
     num_realiz_its = 5  # Num. of iterations for realizability enforcing, d = 5
 
@@ -60,7 +64,7 @@ def tbmix_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=
     lr_scheduler_params = "gamma=1"  # Learning rate scheduler params, d = "gamma=0.9"
     loss = "nllLoss"  # Loss function, d = "nllLoss"
     optimizer = "Adam"  # Optimizer, d = "Adam"
-    batch_size = 32  # Batch size, d = 16
+    batch_size = 16  # Batch size, d = 16
 
     # Define TBMix inputs
     two_invars = True  # Only include the first two invariants tr(S²) and tr(R²)
@@ -69,7 +73,12 @@ def tbmix_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=
     incl_input_markers = False  # Include scalar markers in inputs
     num_input_markers = None  # Number of scalar markers in inputs
     rho = 1.514  # Density of air at -40C with kinematic viscosity, nu = 1e-5 m²/s
+    nu = 1.568e-05  # for PHLL = 5e-6, for CHAN = 1.568e-05
+
+    # Define TBMix outputs
+    num_kernels = 2  # Num. of kernels
     num_tensor_basis = 3  # Num. of tensor bases; for 2D flow = 3, for 3D flow = 10
+    incl_t0_gen = True  # Include generalised T0 from Cai et al. (2024)
 
     # Define splitting of training, validation and testing datasets
     train_test_rand_split = False  # Randomly split database for train and test, d = False
@@ -97,11 +106,11 @@ def tbmix_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=
     assert num_tensor_basis == 3  # Code only currently works for 2D tensor basis
 
     coords, x, tb, y, num_inputs = \
-        tbnn.piter.preprocessing(database, num_dims, num_input_markers,
+        tbnn.piter.preprocessing(dataset, num_dims, num_input_markers,
                                  num_zonal_markers, two_invars, incl_p_invars,
                                  incl_tke_invars, incl_input_markers,
                                  incl_zonal_markers, rho, num_tensor_basis,
-                                 enforce_realiz, num_realiz_its)  # ✓
+                                 enforce_realiz, num_realiz_its, nu)  # ✓
     user_vars = locals()
     current_folder = \
         tbmix_piter.trial_iter(num_seeds, coords, x, tb, y, train_list, valid_list,
@@ -113,7 +122,7 @@ def tbmix_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=
                                max_epochs, min_epochs, interval, avg_interval, loss,
                                optimizer, batch_size, enforce_realiz, num_realiz_its,
                                folder_path, user_vars, print_freq, case_dict,
-                               num_inputs, num_kernels)  # ✓
+                               num_inputs, num_kernels, incl_t0_gen)  # ✓
 
     stop = timeit.default_timer()
     tbnn.write.write_time(start, stop, folder_path, current_folder)  # ✓
@@ -121,11 +130,10 @@ def tbmix_main(database, case_dict, incl_zonal_markers=False, num_zonal_markers=
 
 
 if __name__ == "__main__":
-    # Load database and associated dictionary ✓
-    database_name = "CHAN7_database.txt"  # Data source
-    db2case = tbnn.case_dicts.case_dict_names()
-    case_dict, _, num_skip_rows = db2case[database_name]  # ✓
-    database = np.loadtxt(database_name, skiprows=num_skip_rows)
+    # Load dataset and its case dictionary ✓
+    dataset_name = "CHAN7_dataset.txt"
+    case_dict, _, num_skip_rows = tbnn.case_dicts.get_metadata(dataset_name)  # ✓
+    dataset = np.loadtxt("../Datasets/" + dataset_name, skiprows=num_skip_rows)
 
     # Run TBMix
-    tbmix_main(database, case_dict)  #
+    tbmix_main(dataset, case_dict)  #
