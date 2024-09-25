@@ -1,8 +1,9 @@
-import TBNN as tbnn
 import tbmix_core
 import tbmix_results_writer as tbmix_writer
 import sys
 sys.path.append('../TBNN')
+
+import TBNN as tbnn
 
 
 def tbmix_ops(x_train, tb_train, y_train, x_valid, tb_valid, y_valid, x_test, tb_test,
@@ -10,7 +11,7 @@ def tbmix_ops(x_train, tb_train, y_train, x_valid, tb_valid, y_valid, x_test, tb
               weight_init, weight_init_params, loss, optimizer, init_lr, lr_scheduler,
               lr_scheduler_params, min_epochs, max_epochs, interval, avg_interval,
               print_freq, log, enforce_realiz, num_realiz_its, num_tensor_basis,
-              num_inputs, num_kernels, coords_test, test_list):
+              num_inputs, num_kernels, coords_test, test_list, incl_t0_gen):
 
     # Prepare training batch data in data loader
     dl = tbnn.core.DataLoader(x_train, tb_train, y_train, x_valid, tb_valid, y_valid,
@@ -29,7 +30,8 @@ def tbmix_ops(x_train, tb_train, y_train, x_valid, tb_valid, y_valid, x_test, tb
     # Construct TBMix and perform training and validation
     tbmix = tbmix_core.TBMix(seed, num_kernels, structure=structure,
                              weight_init=weight_init,
-                             weight_init_params=weight_init_params).double()  # ✓
+                             weight_init_params=weight_init_params,
+                             incl_t0_gen=incl_t0_gen).double()  # ✓
     print(tbmix)
     tbmix_tvt = tbmix_core.TBMixTVT(optimizer, num_kernels, init_lr, lr_scheduler,
                                     lr_scheduler_params, min_epochs, max_epochs, interval,
@@ -60,7 +62,7 @@ def trial_iter(num_seeds, coords, x, tb, y, train_list, valid_list, test_list,
                af, af_params, init_lr, lr_scheduler, lr_scheduler_params, weight_init,
                weight_init_params, max_epochs, min_epochs, interval, avg_interval, loss,
                optimizer, batch_size, enforce_realiz, num_realiz_its, folder_path,
-               user_vars, print_freq, case_dict, num_inputs, num_kernels):  #
+               user_vars, print_freq, case_dict, num_inputs, num_kernels, incl_t0_gen):  #
 
     """
     After obtaining x, tb and y from preprocessing, run this function num_seeds times to
@@ -107,7 +109,7 @@ def trial_iter(num_seeds, coords, x, tb, y, train_list, valid_list, test_list,
                       optimizer, init_lr, lr_scheduler, lr_scheduler_params,
                       min_epochs, max_epochs, interval, avg_interval, print_freq, log,
                       enforce_realiz, num_realiz_its, num_tensor_basis, num_inputs,
-                      num_kernels, coords_test, test_list)  # ✓
+                      num_kernels, coords_test, test_list, incl_t0_gen)  # ✓
 
         # Write results for each seed
         tbnn.write.write_bij_results(coords_test, folder_path, seed, mu_bij_pred,

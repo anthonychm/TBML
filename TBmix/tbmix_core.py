@@ -1,16 +1,17 @@
-import TBNN as tbnn
 import numpy as np
 import math
 from scipy.spatial import Voronoi
 import torch
 import torch.nn as nn
+
 import sys
 sys.path.append('../TBNN')
+import TBNN as tbnn
 
 
 class TBMix(nn.Module):
     def __init__(self, seed, num_kernels, structure=None, weight_init="dummy",
-                 weight_init_params="dummy"):  #
+                 weight_init_params="dummy", incl_t0_gen=False):  #
         super(TBMix, self).__init__()
         if structure is None:
             raise Exception("Network structure not defined")
@@ -20,6 +21,7 @@ class TBMix(nn.Module):
         self.weight_init = weight_init
         weight_init_params = weight_init_params.replace(", ", "=")
         self.weight_init_params = weight_init_params.split("=")
+        self.incl_t0_gen = incl_t0_gen
 
         def retrieve_af_params(af_df, layer):  #
             params = af_df.loc[[layer]][layer]
@@ -70,6 +72,13 @@ class TBMix(nn.Module):
         self.z_mu_g2 = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
         self.z_mu_g3 = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
         self.z_sigma = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
+
+        # Include hidden layer outputs for t0_gen if required
+        if self.incl_t0_gen is True:
+            self.z_mu_g01 = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
+            self.z_mu_g02 = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
+            self.z_mu_g03 = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
+
         print("Building of neural network complete")
 
         # Create initialization arguments dictionary and initialize weights and biases
@@ -113,6 +122,15 @@ class TBMix(nn.Module):
             g_coeffs[k, :, 1] = mu_g2[:, k]
             g_coeffs[k, :, 2] = mu_g3[:, k]
 
+        if self.incl_t0_gen is True:
+            mu_g01 = self.z_mu_g01(z_h)  # Tensor (batch size, num kernels)
+            mu_g02 = self.z_mu_g02(z_h)  # Tensor (batch size, num kernels)
+            mu_g03 = self.z_mu_g03(z_h)  # Tensor (batch size, num kernels)
+
+            t01 = torch.tensor([-1 / 3, 0, 0, 0, 1 / 6, 0, 0, 0, 1 / 6])
+            t02 = torch.tensor([1 / 6, 0, 0, 0, -1 / 3, 0, 0, 0, 1 / 6])
+            t03 = torch.tensor([1 / 6, 0, 0, 0, 1 / 6, 0, 0, 0, -1 / 3])
+
         # Calculate mean anisotropy mu_bij
         mu_bij_batch = torch.full((self.num_kernels, x.shape[0], 9), torch.nan)
 
@@ -137,6 +155,10 @@ class TBMix(nn.Module):
         for k in range(self.num_kernels):
             for data_point in range(x.shape[0]):
                 mu_bij = torch.matmul(g_coeffs[k, data_point, :], tb[data_point].float())
+
+                if self.incl_t0_gen is True:
+                    mu_bij = mu_bij + (mu_g01[data_point, k]*t01) + \
+                             (mu_g02[data_point, k]*t02) + (mu_g03[data_point, k]*t03)
 
                 # mu_bij_batch[k, data_point, :] = mu_bij
                 mu_bij_batch[k, data_point, :] = torch.tanh(mu_bij)
