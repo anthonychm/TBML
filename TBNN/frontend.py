@@ -67,6 +67,7 @@ def tbnn_main(dataset, case_dict, incl_zonal_markers=False, num_zonal_markers=0,
     incl_input_markers = False  # Include scalar markers in inputs
     num_input_markers = None  # Number of scalar markers in inputs
     rho = 1.514  # Density of air at -40C with nu = 1e-5 m²/s
+    nu = 1.568e-05  # for PHLL = 5e-6, for CHAN = 1.568e-05
 
     # Define TBNN outputs
     num_tensor_basis = 3  # Num. of tensor bases; for 2D flow = 3, for 3D flow = 10
@@ -103,7 +104,7 @@ def tbnn_main(dataset, case_dict, incl_zonal_markers=False, num_zonal_markers=0,
             preprocessing(dataset, num_dims, num_input_markers, num_zonal_markers,
                           two_invars, incl_p_invars, incl_tke_invars, incl_input_markers,
                           incl_zonal_markers, rho, num_tensor_basis, enforce_realiz,
-                          num_realiz_its)  # ✓
+                          num_realiz_its, nu)  # ✓
         user_vars = locals()
         current_folder = \
             trial_iter(num_seeds, coords, x, tb, y, train_list, valid_list, test_list,
@@ -121,19 +122,19 @@ def tbnn_main(dataset, case_dict, incl_zonal_markers=False, num_zonal_markers=0,
                 preprocessing(zonal_train_dataset[zone][:, 1:], num_dims, num_input_markers,
                               num_zonal_markers, two_invars, incl_p_invars, incl_tke_invars,
                               incl_input_markers, incl_zonal_markers, rho,
-                              num_tensor_basis, enforce_realiz, num_realiz_its)  #
+                              num_tensor_basis, enforce_realiz, num_realiz_its, nu)  #
 
             coords_valid, x_valid, tb_valid, y_valid, num_inputs = \
                 preprocessing(zonal_valid_dataset[zone][:, 1:], num_dims, num_input_markers,
                               num_zonal_markers, two_invars, incl_p_invars, incl_tke_invars,
                               incl_input_markers, incl_zonal_markers, rho,
-                              num_tensor_basis, enforce_realiz, num_realiz_its)  #
+                              num_tensor_basis, enforce_realiz, num_realiz_its, nu)  #
 
             coords_test, x_test, tb_test, y_test, num_inputs = \
                 preprocessing(zonal_test_dataset[zone][:, 1:], num_dims, num_input_markers,
                               num_zonal_markers, two_invars, incl_p_invars, incl_tke_invars,
                               incl_input_markers, incl_zonal_markers, rho,
-                              num_tensor_basis, enforce_realiz, num_realiz_its)  #
+                              num_tensor_basis, enforce_realiz, num_realiz_its, nu)  #
 
             user_vars = locals()
             current_folder = \

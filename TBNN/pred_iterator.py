@@ -12,7 +12,7 @@ import random
 
 def preprocessing(dataset, num_dims, num_input_markers, num_zonal_markers, two_invars,
                   incl_p_invars, incl_tke_invars, incl_input_markers, incl_zonal_markers,
-                  rho, num_tensor_basis, enforce_realiz, num_realiz_its,
+                  rho, num_tensor_basis, enforce_realiz, num_realiz_its, nu,
                   incl_nut_input=True):  # ✓
     """
     Preprocesses the CFD data:
@@ -56,7 +56,7 @@ def preprocessing(dataset, num_dims, num_input_markers, num_zonal_markers, two_i
 
     if incl_nut_input is True:
         nut = 0.09 * np.square(k) / eps
-        r_nu = nut / ((100*5e-6) + nut)
+        r_nu = nut / ((100*nu) + nut)
         r_nu = np.expand_dims(r_nu, axis=1)
         x = np.concatenate((x, r_nu), axis=1)
 
