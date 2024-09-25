@@ -98,7 +98,7 @@ class NetworkStructure:
 
 class Tbnn(nn.Module):
     def __init__(self, device, seed, structure=None, weight_init="dummy",
-                 weight_init_params="dummy"):  # ✓
+                 weight_init_params="dummy", incl_t0_gen=False):  # ✓
         super(Tbnn, self).__init__()
         if structure is None:
             print("Network structure not defined")
@@ -108,6 +108,7 @@ class Tbnn(nn.Module):
         self.weight_init = weight_init
         weight_init_params = weight_init_params.replace(", ", "=")
         self.weight_init_params = weight_init_params.split("=")
+        self.incl_t0_gen = incl_t0_gen
 
         def retrieve_af_params(af_df, layer):  # ✓
             params = af_df.loc[[layer]][layer]
@@ -148,9 +149,16 @@ class Tbnn(nn.Module):
                 af_param_dict = retrieve_af_params(self.structure.af_df, layer)  # ✓
                 self.net.add_module("af" + str(layer+1),
                                     getattr(nn, self.structure.af[layer])(**af_param_dict))
-        self.net.add_module("coeffs_layer", nn.Linear(self.structure.num_hid_nodes[-1],
-                                                      self.structure.num_tensor_basis))
-        print("Building of NN complete")
+        self.z_coeffs = nn.Linear(self.structure.num_hid_nodes[-1],
+                                  self.structure.num_tensor_basis)
+
+        # Include hidden layer outputs for t0_gen if required
+        if self.incl_t0_gen is True:
+            self.z_g01 = nn.Linear(self.structure.num_hid_nodes[-1], 1)
+            self.z_g02 = nn.Linear(self.structure.num_hid_nodes[-1], 1)
+            self.z_g03 = nn.Linear(self.structure.num_hid_nodes[-1], 1)
+
+        print("Building of neural network complete")
 
         # Create initialization arguments dictionary and initialize weights and biases ✓
         param_keys, param_val = [], []
@@ -177,25 +185,35 @@ class Tbnn(nn.Module):
 
     # Forward propagation
     def forward(self, x, tb, device):
-        coeffs = self.net(x)
-        for data_point in range(0, len(coeffs)):
-            for bij_comp in range(0, 9):
-                tensors = torch.index_select(tb[data_point], 1,
+        # Predict coefficients in forward pass
+        z_h = self.net(x)
+        coeffs = self.z_coeffs(z_h)
+
+        def pred_t0_gen():
+            # Predict generalised T0 and use it to initialise bij_batch_pred tensor
+            g01 = self.z_g01(z_h)
+            g02 = self.z_g02(z_h)
+            g03 = self.z_g03(z_h)
+
+            t01 = torch.tensor([[-1 / 3, 0, 0, 0, 1 / 6, 0, 0, 0, 1 / 6]])
+            t02 = torch.tensor([[1 / 6, 0, 0, 0, -1 / 3, 0, 0, 0, 1 / 6]])
+            t03 = torch.tensor([[1 / 6, 0, 0, 0, 1 / 6, 0, 0, 0, -1 / 3]])
+
+            return torch.mul(g01, t01) + torch.mul(g02, t02) + torch.mul(g03, t03)
+
+        # Initialise bij batch prediction tensor
+        if self.incl_t0_gen is True:
+            bij_batch_pred = pred_t0_gen().double()
+        else:
+            bij_batch_pred = torch.zeros(len(coeffs), 9, dtype=torch.double)
+
+        # Populate bij batch prediction tensor
+        for point in range(len(coeffs)):
+            for bij_comp in range(9):
+                tensors = torch.index_select(tb[point], 1,
                                              torch.tensor([bij_comp]).to(device))
                 tensors = torch.squeeze(tensors, dim=1)
-                bij_tmp = torch.dot(coeffs[data_point], tensors)
-                bij_tmp = torch.unsqueeze(bij_tmp, dim=0)
-                if "bij_row" in locals():
-                    bij_row = torch.cat((bij_row, bij_tmp), dim=0)
-                else:
-                    bij_row = bij_tmp
-            bij_row = torch.unsqueeze(bij_row, dim=0)
-
-            if "bij_batch_pred" in locals():
-                bij_batch_pred = torch.cat((bij_batch_pred, bij_row), dim=0)
-            else:
-                bij_batch_pred = bij_row
-            del bij_row
+                bij_batch_pred[point, bij_comp] += torch.dot(coeffs[point], tensors)
 
         return bij_batch_pred
 
