@@ -129,17 +129,21 @@ class ChanLinePlotter:
             plt.plot(self.y_var, mu_k, linewidth=1, label="kernel " + str(k_count))
             plt.fill_between(self.y_var, mu_k + sigma_k, mu_k - sigma_k, alpha=0.3)
 
-    def fill_oti_subdomain(self, plt, ymin, ymax):
+    def fill_oti_subdomain(self, plt):
         # Fill the y+ range containing one-to-interval relation between alpha and b12
-        # where alpha (= (k/eps)*(du/dy)) < 3.4
+        # where alpha (= (k/eps)*(du/dy)) > 3.4
 
         # Specify y+ range containing the one-to-interval region
-        yplus_oti = [[], [], [], [], [], [], []]
+        yplus_oti = [[8.2, 85.2], [8.4, 124.3], [8.0, 163.0], [8.2, 203.7], [7.9, 235.9],
+                     [8.0, 307.7], [7.2, 363.0]]
         yplus_oti_dict = dict(zip(self.Re_list, yplus_oti))
 
         # Plot rectangular fill representing one-to-interval region
         left, right = yplus_oti_dict[self.Re][0], yplus_oti_dict[self.Re][1]
-        plt.Rectangle((left, ymin), right-left, ymax-ymin, facecolor="red", alpha=0.1)
+        ymin, ymax = -0.175, 0
+        rect = plt.Rectangle((left, ymin), right-left, ymax-ymin, facecolor="red",
+                             alpha=0.1)
+        plt.gca().add_patch(rect)
 
         # Plot bounding lines around rectangle
         plt.plot([left, left], [ymin, ymax], 'k--')
