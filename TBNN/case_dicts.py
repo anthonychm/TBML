@@ -3,7 +3,9 @@ def get_metadata(dataset_name):
                 "FBFS5_dataset.txt": fbfs5(),
                 "FBFS5_IMPJ20000_dataset.txt": fbfs5_impj20000(),
                 "PHLL4_dataset.txt": phll4(),
-                "CHAN7_no_oti_half_dataset.txt": half_chan7_no_oti()}
+                "CHAN7_no_oti_half_dataset.txt": half_chan7_no_oti(),
+                "CHAN7_with_interps_half_dataset.txt": half_chan7_with_interps(),
+                "CHAN7_no_oti_with_interps_half_dataset.txt": half_chan7_no_oti_with_interps()}
     return ref_dict[dataset_name]
 
 
@@ -50,6 +52,14 @@ def half_chan7_no_oti():
 def half_chan7_with_interps():
     keys = [180, 290, 395, 490, 590, 760, 945]
     num_points = 600
+    case_dict = dict.fromkeys(keys, num_points)
+    num_skip_rows = 1
+    return case_dict, num_points, num_skip_rows
+
+
+def half_chan7_no_oti_with_interps():
+    keys = [180, 290, 395, 490, 590, 760, 945]
+    num_points = 400
     case_dict = dict.fromkeys(keys, num_points)
     num_skip_rows = 1
     return case_dict, num_points, num_skip_rows
