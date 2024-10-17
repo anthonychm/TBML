@@ -19,9 +19,9 @@ class ResultsLoader:
         self.path = None
 
     def declare_ml_results_path(self):
-        self.path = "../" + self.model + "/Saved results/MDN Feb 2024 PHLL trials/Trial " \
-                    + str(self.trial) + "/Trial" + str(self.trial) + "_seed" + \
-                    str(self.seed) + "_"
+        self.path = "../" + self.model + "/Saved results/MDN Feb 2024 " + \
+                    self.dataset[:4] + " trials/Trial " + str(self.trial) + "/Trial" + \
+                    str(self.trial) + "_seed" + str(self.seed) + "_"
 
     def load_tbnn_results(self):
         # Load tbnn results - these are deterministic
