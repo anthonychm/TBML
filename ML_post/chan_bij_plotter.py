@@ -48,7 +48,7 @@ def main():
     # true_plotter.fill_oti_subdomain(plt, ymin, ymax)
 
     # Plot RANS and LES bij results
-    plt.plot(rans_plotter.y_var, rans_plotter.bij[:, col_idx], 'r',
+    plt.plot(rans_plotter.y_var, rans_plotter.bij[:, col_idx], 'k',
              linewidth=1, label="RANS")
     plt.plot(true_plotter.y_var, true_plotter.bij[:, col_idx], 'g', linewidth=1,
              label="LES")
@@ -85,7 +85,7 @@ def main():
 
         # Plot bij results from ML
         if ml_loader.model == "TBNN":
-            plt.plot(ml_plotter.y_var, ml_plotter.bij[:, col_idx], 'k', linewidth=1,
+            plt.plot(ml_plotter.y_var, ml_plotter.bij[:, col_idx], 'm', linewidth=1,
                      label=ml_loader.model)
         elif ml_loader.model == "TBmix":
             mu = ml_plotter.extract_mu_bij_comp(col_idx)
