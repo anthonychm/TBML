@@ -55,7 +55,8 @@ class ResultsLoader:
     @staticmethod
     def load_cmp_results():
         # Load RANS and LES results for comparison
-        rans_result = np.loadtxt("CHAN7/CHAN7_rans_ref_table.txt", skiprows=1)
+        rans_result = np.loadtxt("../Datasets/RANS ref tables/CHAN7_rans_ref_table.txt",
+                                 skiprows=1)
         true_result = np.loadtxt("../Datasets/CHAN7_dataset.txt", skiprows=1)
         return rans_result, true_result
 
