@@ -92,6 +92,7 @@ def main():
             ml_plotter.plot_kernel_bij(plt, mu)
 
     # Format bij plot
+    true_plotter.fill_oti_subdomain(plt)
     true_plotter.fmt_bij_plot(plt, dim_var_name, bij_comp)
 
 
