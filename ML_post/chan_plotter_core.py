@@ -124,7 +124,7 @@ class ChanLinePlotter:
 
     def plot_kernel_bij(self, plt, mu):
         # Plot kernel bij results from TBmix
-        plt.gca().set_prop_cycle(color=['#7e4794', '#0b81a2', '#f0c571', '#59a89c',
+        plt.gca().set_prop_cycle(color=['#d95f02', '#008dff', '#f0c571', '#59a89c',
                                         '#9d2c00'])
         k_count = 0
         for mu_k, sigma_k in zip(mu.T, self.sigma.T):
@@ -144,7 +144,7 @@ class ChanLinePlotter:
         # Plot rectangular fill representing one-to-interval region
         left, right = yplus_oti_dict[self.Re][0], yplus_oti_dict[self.Re][1]
         ymin, ymax = -0.175, 0
-        rect = plt.Rectangle((left, ymin), right-left, ymax-ymin, facecolor="red",
+        rect = plt.Rectangle((left, ymin), right-left, ymax-ymin, facecolor="#FF0000",
                              alpha=0.2)
         plt.gca().add_patch(rect)
 
