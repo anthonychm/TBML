@@ -89,6 +89,7 @@ class ChanLinePlotter:
         self.y_var = None
         self.bij = bij
         self.mix_coeffs = None
+        self.sigma = None
 
         if mix_bij is True:
             self.mu_bij_all = locals_dict['mu_bij_all'][:, :, 1:]
