@@ -1,9 +1,6 @@
 """
 This script plots line profiles of bij predicted by ML vs. RANS SST vs. LES in channel
 flow cases.
-
-Test 3: [TBNN, TBmix]
-Test 4: one-to-two TBmix
 """
 
 import matplotlib.pyplot as plt
