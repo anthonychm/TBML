@@ -144,7 +144,7 @@ class ChanLinePlotter:
 
         # Plot rectangular fill representing one-to-interval region
         left, right = yplus_oti_dict[self.Re][0], yplus_oti_dict[self.Re][1]
-        ymin, ymax = -0.175, 0
+        ymin, ymax = -10, 10
         rect = plt.Rectangle((left, ymin), right-left, ymax-ymin, facecolor="#FF0000",
                              alpha=0.2)
         plt.gca().add_patch(rect)
