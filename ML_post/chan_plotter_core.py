@@ -125,13 +125,13 @@ class ChanLinePlotter:
 
     def plot_kernel_bij(self, plt, mu):
         # Plot kernel bij results from TBmix
-        plt.gca().set_prop_cycle(color=['#d95f02', '#008dff', '#f0c571', '#59a89c',
+        plt.gca().set_prop_cycle(color=['b', '#008dff', '#f0c571', '#59a89c',
                                         '#9d2c00'])
         k_count = 0
         for mu_k, sigma_k in zip(mu.T, self.sigma.T):
             k_count += 1
             plt.plot(self.y_var, mu_k, linewidth=1, label="kernel " + str(k_count))
-            plt.fill_between(self.y_var, mu_k + sigma_k, mu_k - sigma_k, alpha=0.3)
+            plt.fill_between(self.y_var, mu_k + sigma_k, mu_k - sigma_k, alpha=0.2)
 
     def fill_oti_subdomain(self, plt):
         # Fill the y+ range containing one-to-interval relation between alpha and b12
@@ -146,7 +146,7 @@ class ChanLinePlotter:
         left, right = yplus_oti_dict[self.Re][0], yplus_oti_dict[self.Re][1]
         ymin, ymax = -10, 10
         rect = plt.Rectangle((left, ymin), right-left, ymax-ymin, facecolor="#FF0000",
-                             alpha=0.2)
+                             alpha=0.1)
         plt.gca().add_patch(rect)
 
         # Plot bounding lines around rectangle
