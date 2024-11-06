@@ -111,8 +111,8 @@ class ZonalDataPlotter:
 
         # Calculate Ak
         def extract_gradk(case_list, parent_path):
-            gradk_dict = zmc.load_marker_data_apr2023(case_list[0], parent_path,
-                                                      ["gradkx", "gradky", "gradkz"])
+            gradk_dict = zmc.load_marker_data(case_list[0], parent_path,
+                                              ["gradkx", "gradky", "gradkz"])
             gradk = np.hstack((np.hstack((np.expand_dims(gradk_dict["gradkx"], axis=1),
                                           np.expand_dims(gradk_dict["gradky"], axis=1))),
                                np.expand_dims(gradk_dict["gradkz"], axis=1)))
@@ -123,9 +123,9 @@ class ZonalDataPlotter:
 
         # Calculate Ap
         def extract_gradp_and_u(case_list, parent_path):
-            gradp_dict = zmc.load_marker_data_apr2023(case_list[0], parent_path,
-                                                      ["gradpx", "gradpy", "gradpz",
-                                                       "Ux", "Uy", "Uz"])
+            gradp_dict = zmc.load_marker_data(case_list[0], parent_path,
+                                              ["gradpx", "gradpy", "gradpz", "Ux", "Uy",
+                                               "Uz"])
             gradp = np.hstack((np.hstack((np.expand_dims(gradp_dict["gradpx"], axis=1),
                                           np.expand_dims(gradp_dict["gradpy"], axis=1))),
                                np.expand_dims(gradp_dict["gradpz"], axis=1)))
@@ -152,7 +152,7 @@ class ZonalDataPlotter:
 
     def calc_nondim_tau_yy(self, zone, case_list):
         parent_path = zmc.get_parent_path(case_list[0])
-        tau_dict = zmc.load_marker_data_apr2023(case_list[0], parent_path, ["tau"])
+        tau_dict = zmc.load_marker_data(case_list[0], parent_path, ["tau"])
         tau_yy = tau_dict["tau"][:, 3]
         k = self.zonal_db_dict[zone][:, 3]
         nondim_tau_yy = np.full((k.shape[0], 1), np.nan)

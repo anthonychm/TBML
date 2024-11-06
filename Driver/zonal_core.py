@@ -16,7 +16,7 @@ class ZonalSplitter:
         # Assemble dictionary containing zonal markers as keys
         for case in self.case_list:
             parent_path = zmc.get_parent_path(case)  # ✓
-            coords_dict = zmc.load_marker_data_apr2023(case, parent_path, coords_list)  # ✓
+            coords_dict = zmc.load_marker_data(case, parent_path, coords_list)  # ✓
             self.num_rows_list.append(len(coords_dict["Cx"]))
             for coord in coords_list:
                 self.marker_dict[coord].extend(coords_dict[coord])
@@ -136,7 +136,7 @@ class OutputCalculator:
         # Create dictionary of normalization scalars for each case for LES k
         for case in self.k_normzr_dict:
             parent_path = zmc.get_parent_path(case)  # ✓
-            data_dict = zmc.load_marker_data_apr2023(case, parent_path, ["k"])  # ✓
+            data_dict = zmc.load_marker_data(case, parent_path, ["k"])  # ✓
             self.k_normzr_dict[case] = max(data_dict["k"])
 
     def normalize_k_output(self):  # ✓

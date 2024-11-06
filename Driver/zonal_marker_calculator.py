@@ -50,7 +50,7 @@ def create_var_dict(var_list, parent_path, child_path, case):
     return var_dict
 
 
-def load_marker_data_apr2023(case, parent_path, var_list):
+def load_marker_data(case, parent_path, var_list):
     # Load data for calculating zonal markers ✓
     if "FBFS" in case:
         var_dict = create_var_dict(var_list, parent_path, "/" + case + "/", case)
