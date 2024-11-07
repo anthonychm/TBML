@@ -35,6 +35,9 @@ def get_parent_path(case):
     elif any(name in case for name in ["BUMP", "CBFS", "CNDV", "PHLL", "DUCT"]):
         parent_path = ("C:/Users/h81475am/Dropbox (The University of Manchester)/PhD_Anthony_Man/"
                        "AM_PhD_shared_documents/McConkey data")
+    elif any(name in case for name in ["SQCY", "TACY"]):
+        parent_path = ("C:/Users/h81475am/Dropbox (The University of Manchester)/"
+                       "PhD_Anthony_Man/AM_PhD_shared_documents/Geneva data")
     else:
         raise Exception("No matching parent path for this case")
     return parent_path
