@@ -29,8 +29,9 @@ def calc_zonal_markers():
 
 def get_parent_path(case):
     # Get parent directory path for the given case ✓
-    if "FBFS" in case:
-        parent_path = "C:/Users/h81475am/Dropbox (The University of Manchester)/PhD_Anthony_Man/ML Database/FBFS"
+    if any(name in case for name in ["FBFS", "IMPJ"]):
+        parent_path = "C:/Users/h81475am/Dropbox (The University of " \
+                      "Manchester)/PhD_Anthony_Man/ML Database/" + case[:4]
     elif any(name in case for name in ["BUMP", "CBFS", "CNDV", "PHLL", "DUCT"]):
         parent_path = ("C:/Users/h81475am/Dropbox (The University of Manchester)/PhD_Anthony_Man/"
                        "AM_PhD_shared_documents/McConkey data")
