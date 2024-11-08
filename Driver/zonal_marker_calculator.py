@@ -56,7 +56,7 @@ def create_var_dict(var_list, parent_path, child_path, case):
 
 def load_marker_data(case, parent_path, var_list):
     # Load data for calculating zonal markers ✓
-    if "FBFS" in case:
+    if any(name in case for name in ["FBFS", "IMPJ"]):
         var_dict = create_var_dict(var_list, parent_path, "/" + case + "/", case)
     elif any(name in case for name in ["BUMP", "CBFS", "CNDV", "PHLL", "DUCT"]):
         turb_model = "komegasst"
@@ -80,7 +80,8 @@ def get_nu(case):
         "CNDV_12600": 7.94e-5,  # ✓
         "CNDV_20580": 4.86e-5,  # ✓
         "CBFS": 7.3e-5,  # ✓
-        "FBFS": 1e-5  # ✓
+        "FBFS": 1e-5,  # ✓
+        "IMPJ": 1.5e-5  # ✓
     }
 
     for key in nu_dict:
@@ -155,7 +156,7 @@ def write_vars(case, vars_dict, *args):
 
 def load_zonal_markers_apr2023(case, parent_path, marker_list):
     # Load calculated zonal markers ✓
-    if "FBFS" in case:
+    if any(name in case for name in ["FBFS", "IMPJ"]):
         marker_dict = create_var_dict(marker_list, parent_path, "/zonal criteria/", case)
     elif any(name in case for name in ["BUMP", "CBFS", "CNDV", "PHLL", "DUCT"]):
         turb_model = "komegasst"
