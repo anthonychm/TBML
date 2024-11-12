@@ -61,6 +61,9 @@ def load_marker_data(case, parent_path, var_list):
     elif any(name in case for name in ["BUMP", "CBFS", "CNDV", "PHLL", "DUCT"]):
         turb_model = "komegasst"
         var_dict = create_var_dict(var_list, parent_path, "/" + turb_model + "/" + turb_model + "_", case)
+    elif any(name in case for name in ["SQCY", "TACY"]):
+        turb_model = "kepsilon"
+        var_dict = create_var_dict(var_list, parent_path, "/" + turb_model + "/" + turb_model + "_", case)
     else:
         raise Exception("No matching data for this case")
     return var_dict
