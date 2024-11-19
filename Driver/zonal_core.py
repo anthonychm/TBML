@@ -21,7 +21,7 @@ class ZonalSplitter:
             for coord in coords_list:
                 self.marker_dict[coord].extend(coords_dict[coord])
 
-            marker_dict = zmc.load_zonal_markers_apr2023(case, parent_path, marker_list)  # ✓
+            marker_dict = zmc.load_zonal_markers(case, parent_path, marker_list)  # ✓
             for marker in marker_list:
                 self.marker_dict[marker].extend(marker_dict[marker])
 

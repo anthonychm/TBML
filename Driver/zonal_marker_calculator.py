@@ -158,7 +158,7 @@ def write_vars(case, vars_dict, *args):
         np.savetxt(case + "_" + var + ".txt", vars_dict[var])
 
 
-def load_zonal_markers_apr2023(case, parent_path, marker_list):
+def load_zonal_markers(case, parent_path, marker_list):
     # Load calculated zonal markers ✓
     if any(name in case for name in ["FBFS", "IMPJ"]):
         marker_dict = create_var_dict(marker_list, parent_path, "/zonal criteria/", case)
