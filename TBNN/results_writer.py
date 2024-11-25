@@ -40,10 +40,8 @@ def write_bij_results(coords_test, folder_path, seed, predicted_bij, current_fol
     predicted_bij = np.hstack((coords_test, predicted_bij))
     np.savetxt(os.path.join(folder_path, 'Trials', 'Trial ' + str(current_folder),
                             'Trial' + str(current_folder) + '_seed' + str(seed) +
-                            '_TBNN_test_prediction_bij.txt'), predicted_bij, delimiter=' ',
-               header=("Cx Cy uPrime2Mean uPrimevPrimeMean uPrimewPrimeMean "
-                       "vPrimeuPrimeMean vPrime2Mean vPrimewPrimeMean wPrimeuPrimeMean "
-                       "wPrimevPrimeMean wPrime2Mean"))
+                            '_TBNN_test_prediction_bij.txt'), predicted_bij,
+               delimiter=' ', header="Cx Cy b11 b12 b13 b21 b22 b23 b31 b32 b33")
 
 
 def write_test_truth_bij(coords, folder_path, true_bij):  # ✓
@@ -56,10 +54,7 @@ def write_test_truth_bij(coords, folder_path, true_bij):  # ✓
 
     true_bij = np.hstack((coords, true_bij))
     np.savetxt(os.path.join(folder_path, 'LES_test_truth_bij.txt'), true_bij,
-               delimiter=' ', header=('Cx Cy uPrime2Mean uPrimevPrimeMean '
-                                      'uPrimewPrimeMean vPrimeuPrimeMean vPrime2Mean '
-                                      'vPrimewPrimeMean wPrimeuPrimeMean '
-                                      'wPrimevPrimeMean wPrime2Mean'))
+               delimiter=' ', header='Cx Cy b11 b12 b13 b21 b22 b23 b31 b32 b33')
 
 
 def init_log(folder_path, seed):  # ✓
