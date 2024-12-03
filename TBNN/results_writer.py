@@ -147,7 +147,7 @@ def write_param_txt(current_folder, folder_path, user_vars):  # ✓
                 vars_file.write(str(var_name) + " " + str(user_vars[var_name]) + "\n")
 
 
-def write_param_csv(current_folder, folder_path, user_vars):  # ✓
+def write_param_csv(current_folder, folder_path, user_vars, model='tbnn'):  # ✓
     # Write new row in Trial_parameters_and_means.csv file
     var_name_list = ["trial", "num_hid_layers", "num_hid_nodes", "num_tensor_basis",
                      "max_epochs", "min_epochs", "interval", "avg_interval",
@@ -159,8 +159,16 @@ def write_param_csv(current_folder, folder_path, user_vars):  # ✓
                      "train_test_split_frac", "train_valid_rand_split",
                      "train_valid_split_frac", "train_list", "valid_list", "test_list",
                      "num_dims"]
-    postprocess_name_list = ["run_time", "Mean_final_training_rmse",
-                             "Mean_final_validation_rmse", "Mean_testing_rmse"]
+
+    if model == 'tbnn':
+        postprocess_name_list = ["run_time", "Mean_final_training_rmse",
+                                 "Mean_final_validation_rmse", "Mean_testing_rmse"]
+    elif model == 'tbmix':
+        postprocess_name_list = ["run_time", "Mean_final_train_avg_nll_loss",
+                                 "Mean_final_valid_avg_nll_loss",
+                                 "Mean_testing_avg_nll_loss", "Mean_testing_rmse"]
+    else:
+        raise Exception('Model name is invalid')
     all_name_list = var_name_list + postprocess_name_list
 
     # Check if Trial_parameters_and_means.csv file exists
