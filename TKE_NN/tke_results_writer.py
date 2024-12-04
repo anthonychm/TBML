@@ -77,3 +77,18 @@ def write_k_results(coords_test, folder_path, seed, predicted_logk, current_fold
                             'Trial' + str(current_folder) + '_seed' + str(seed) +
                             '_TKENN_test_prediction.txt'), write_array, delimiter=' ',
                header="Cx Cy log(k) k")
+
+
+def write_k_results_v2(coords_test, folder_path, seed, predicted_logk, current_folder,
+                       test_case_tags, test_output_normzr, zone):  # ✓
+
+    # Write log(k/max(k_rans)) and k results
+    predicted_k = np.full((predicted_logk.shape[0], 1), np.nan)
+    for i, val in enumerate(predicted_logk):
+        predicted_k[i, 0] = \
+            np.exp(predicted_logk)*test_output_normzr[test_case_tags[zone][i]]
+    write_array = np.hstack((coords_test, predicted_logk, predicted_k))
+    np.savetxt(os.path.join(folder_path, 'Trials', 'Trial ' + str(current_folder),
+                            'Trial' + str(current_folder) + '_seed' + str(seed) +
+                            '_TKENN_test_prediction.txt'), write_array, delimiter=' ',
+               header="Cx Cy log(k/max(k_rans)) k")
