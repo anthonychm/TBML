@@ -6,9 +6,9 @@ from tke_results_writer import write_param_txt, write_param_csv, write_test_trut
     write_k_results, write_k_results_v2
 
 
-def preprocessing(database, num_dims, num_input_markers, num_zonal_markers, incl_p_invars,
-                  incl_tke_invars, incl_input_markers, incl_zonal_markers, rho,
-                  incl_RANS_k):
+def preprocessing(database, num_dims, num_input_markers, num_zonal_markers, two_invars,
+                  incl_p_invars, incl_tke_invars, incl_input_markers, incl_zonal_markers,
+                  rho, incl_rans_k):
     # Load in data ✓
     coords, k, eps, grad_u, grad_p, u, grad_k, input_markers, tauij = \
         tbnn.preprocessor.load_data(database, num_dims, num_input_markers,
@@ -17,13 +17,13 @@ def preprocessing(database, num_dims, num_input_markers, num_zonal_markers, incl
     print("Data loading complete")
 
     # Calculate inputs and outputs ✓
-    data_processor = calculator.PopeDataProcessor()  # ✓
-    _, _, x = preprocessor.scalar_basis_manager(data_processor, k, eps, grad_u, rho,
-                                                u, grad_p, grad_k, incl_p_invars,
-                                                incl_tke_invars)  # ✓
+    data_processor = tbnn.calculator.PopeDataProcessor()  # ✓
+    _, _, x = tbnn.preprocessor.scalar_basis_manager(data_processor, k, eps, grad_u, rho,
+                                                u, grad_p, grad_k, two_invars,
+                                                incl_p_invars, incl_tke_invars)  # ✓
     if incl_input_markers is True:
         x = np.concatenate((x, input_markers), axis=1)  # ✓
-    if incl_RANS_k is True:
+    if incl_rans_k is True:
         # Log-normalize k
         x = np.concatenate((x, np.log10(np.expand_dims(k, axis=1))), axis=1)
     num_inputs = x.shape[1]
