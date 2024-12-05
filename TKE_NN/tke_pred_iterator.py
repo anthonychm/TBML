@@ -1,5 +1,5 @@
 import numpy as np
-from TBNN import calculator, preprocessor, pred_iterator, results_writer
+import TBNN as tbnn
 from tke_core import tkenn_ops
 from tke_preprocessor import calc_output, split_database
 from tke_results_writer import write_param_txt, write_param_csv, write_test_truth_logk, \
@@ -11,7 +11,7 @@ def preprocessing(database, num_dims, num_input_markers, num_zonal_markers, incl
                   incl_RANS_k):
     # Load in data ✓
     coords, k, eps, grad_u, grad_p, u, grad_k, input_markers, tauij = \
-        preprocessor.load_data(database, num_dims, num_input_markers,
+        tbnn.preprocessor.load_data(database, num_dims, num_input_markers,
                                num_zonal_markers, incl_p_invars, incl_tke_invars,
                                incl_input_markers, incl_zonal_markers)  # ✓
     print("Data loading complete")
@@ -44,15 +44,15 @@ def trial_iter(num_seeds, coords, x, y, train_list, valid_list, test_list,
     # Loop the following for each instance (seed) of TKENN:
     for seed in range(1, num_seeds + 1):
         # Set up results logs, lists and files ✓
-        current_folder, log = results_writer.init_log(folder_path, seed)  # ✓
+        current_folder, log = tbnn.results_writer.init_log(folder_path, seed)  # ✓
         if seed == 1:
             final_train_rmse_list, final_valid_rmse_list, test_rmse_list = \
-                results_writer.errors_list_init()  # ✓
+                tbnn.results_writer.errors_list_init()  # ✓
             write_param_txt(current_folder, folder_path, user_vars)  # ✓
             write_param_csv(current_folder, folder_path, user_vars)  # ✓
 
         # Prepare TVT datasets ✓
-        pred_iterator.set_seed(seed)  # ✓
+        tbnn.pred_iterator.set_seed(seed)  # ✓
         coords_train, x_train, y_train, coords_test, x_test, y_test, coords_valid, \
         x_valid, y_valid = \
             split_database(coords, x, y, train_list, valid_list, test_list, seed,
@@ -77,10 +77,11 @@ def trial_iter(num_seeds, coords, x, y, train_list, valid_list, test_list,
         test_rmse_list.append(test_rmse)
 
     # Write results for each trial ✓
-    results_writer.write_trial_rmse_csv(final_train_rmse_list, final_valid_rmse_list,
+    tbnn.results_writer.write_trial_rmse_csv(final_train_rmse_list, final_valid_rmse_list,
                                         test_rmse_list, folder_path,
                                         current_folder)  # ✓
-    results_writer.write_error_means_csv(final_train_rmse_list, final_valid_rmse_list,
+    tbnn.results_writer.write_error_means_csv(final_train_rmse_list,
+                                              final_valid_rmse_list,
                                          test_rmse_list, folder_path,
                                          current_folder)  # ✓
 
@@ -97,14 +98,14 @@ def trial_iter_v2(num_seeds, x_train, y_train, x_valid, y_valid, coords_test, x_
     # Loop the following for each instance (seed) of TKENN:
     for seed in range(1, num_seeds + 1):
         # Set up results logs, lists and files ✓
-        current_folder, log = results_writer.init_log(folder_path, seed)  # ✓
+        current_folder, log = tbnn.results_writer.init_log(folder_path, seed)  # ✓
         if seed == 1:
             final_train_rmse_list, final_valid_rmse_list, test_rmse_list = \
-                results_writer.errors_list_init()  # ✓
+                tbnn.results_writer.errors_list_init()  # ✓
             write_param_txt(current_folder, folder_path, user_vars)  # ✓
             write_param_csv(current_folder, folder_path, user_vars)  # ✓
             write_test_truth_logk(coords_test, folder_path, y_test)  # ✓
-        pred_iterator.set_seed(seed)  # ✓
+        tbnn.pred_iterator.set_seed(seed)  # ✓
 
         # Run TKENN operations ✓
         epoch_count, final_train_rmse, final_valid_rmse, y_pred, test_rmse = \
@@ -122,10 +123,11 @@ def trial_iter_v2(num_seeds, x_train, y_train, x_valid, y_valid, coords_test, x_
         test_rmse_list.append(test_rmse)
 
     # Write results for each trial ✓
-    results_writer.write_trial_rmse_csv(final_train_rmse_list, final_valid_rmse_list,
+    tbnn.results_writer.write_trial_rmse_csv(final_train_rmse_list, final_valid_rmse_list,
                                         test_rmse_list, folder_path,
                                         current_folder)  # ✓
-    results_writer.write_error_means_csv(final_train_rmse_list, final_valid_rmse_list,
+    tbnn.results_writer.write_error_means_csv(final_train_rmse_list,
+                                              final_valid_rmse_list,
                                          test_rmse_list, folder_path,
                                          current_folder)  # ✓
 
