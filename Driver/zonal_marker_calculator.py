@@ -152,6 +152,46 @@ def calc_Re_y(k, wall_dist, nu):
     return Re_y
 
 
+def calc_visc_ratio(k, eps, nu, C_mu=0.09):
+    # Calculate viscosity ratio, r_nu = nut/((100*nu) + nut) ✓
+    nut = C_mu*np.divide(np.square(k), eps)
+    r_nu = np.divide(nut, (100*nu) + nut)
+    return r_nu
+
+
+def calc_two_dim_traces(k, eps, S, R, limit=True):
+    # Calculate two-dimensional traces tr(S^2) and tr(R^2) ✓
+
+    # Calculate non-dimensional S11, S12, and R12
+    S11, S12, R12 = np.full_like(k, np.nan), np.full_like(k, np.nan), \
+                    np.full_like(k, np.nan)
+    k_eps = np.divide(k, eps)
+    for i in range(len(k_eps)):
+        S11[i] = k_eps[i]*S[i, 0, 0]
+        S12[i] = k_eps[i]*S[i, 0, 1]
+        R12[i] = k_eps[i]*R[i, 0, 1]
+
+    # Define magnitude limiting function
+    def limit_comp(comp, lim_val=1e-10):
+        for i in range(len(comp)):
+            if -lim_val < comp[i] < 0:
+                comp[i] = -lim_val
+            elif 0 <= comp[i] < lim_val:
+                comp[i] = lim_val
+        return comp
+
+    # Limit minimum magnitude of the components
+    if limit is True:
+        S11 = limit_comp(S11)
+        S12 = limit_comp(S12)
+        R12 = limit_comp(R12)
+
+    # Calculate traces
+    S_sq_trace = 2*((S11**2) + (S12**2))
+    R_sq_trace = -2*(R12**2)
+    return S_sq_trace, R_sq_trace
+
+
 def write_vars(case, vars_dict, *args):
     # Write results as a .txt file ✓
     for var in args:
