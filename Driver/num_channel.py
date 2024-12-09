@@ -206,17 +206,17 @@ class ClusterClass:
     def plot_alpha_vs_clusters_subplots(self, true_g1, true_g2, true_g3, cluster_labels1,
                                         cluster_labels2, cluster_labels3):
 
-        def plot_line_subplots(true_gn, cluster_labels, ax, title):
+        def plot_line_subplots(true_gn, cluster_labels, ax, title, ylim):
             colors = cm.bwr(cluster_labels.astype(float))  # bwr
             ax.plot(self.alpha, true_gn, 'k')
-            ax.scatter(self.alpha, true_gn, c=colors, s=20)
-            ax.set(xlabel="α", xticks=self.xticks, xlim=[0, 4], title=title)
+            ax.scatter(self.alpha, true_gn, c=colors, s=20, clip_on=False)
+            ax.set(xlabel="α", xticks=self.xticks, xlim=[0, 4], title=title, ylim=ylim)
             ax.tick_params(axis='both', which='major', labelsize=10)
 
         fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
-        plot_line_subplots(true_g1, cluster_labels1, ax1, "g1")
-        plot_line_subplots(true_g2, cluster_labels2, ax2, "g2")
-        plot_line_subplots(true_g3, cluster_labels3, ax3, "g3")
+        plot_line_subplots(true_g1, cluster_labels1, ax1, "g1", ylim=[-0.3, 0])
+        plot_line_subplots(true_g2, cluster_labels2, ax2, "g2", ylim=[-4, 0])
+        plot_line_subplots(true_g3, cluster_labels3, ax3, "g3", ylim=[0, 22.5])
         plt.show()
 
 
