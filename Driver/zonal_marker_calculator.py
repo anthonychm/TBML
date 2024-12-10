@@ -16,8 +16,8 @@ def calc_zonal_markers():
     case = "FBFS_7200"
 
     parent_path = get_parent_path(case)
-    var_dict = load_marker_data_apr2023(case, parent_path, ["S", "R", "k", "Ux", "Uy", "Uz", "wall_dist"])  # ✓
-    S, R, k, Ux, Uy, Uz, wall_dist = unpack_var_dict_calc(var_dict)  # ✓
+    var_dict = load_marker_data(case, parent_path, ["S", "R", "k", "epsilon"])  # ✓
+    S, R, k, eps = unpack_var_dict_calc(var_dict)  # ✓
     nu = get_nu(case)
     #nd_Q = calc_nd_Q(S, R)
     #nd_TI = calc_nd_TI(k, Ux, Uy, Uz)
@@ -72,8 +72,7 @@ def load_marker_data(case, parent_path, var_list):
 
 def unpack_var_dict_calc(var_dict):
     # Unpack variable dictionary for calculating zonal markers
-    return var_dict["S"], var_dict["R"], var_dict["k"], var_dict["Ux"], var_dict["Uy"], var_dict["Uz"], \
-        var_dict["wall_dist"]
+    return var_dict["S"], var_dict["R"], var_dict["k"], var_dict["epsilon"]
 
 
 def get_nu(case):
