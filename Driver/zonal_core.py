@@ -153,13 +153,21 @@ class OutputCalculator:
                            self.zonal_db_dict[zone]))
 
 
-def load_true_tauij(parent_path, case):  # ✓
-    if "FBFS" in case:
+def load_true_tauij(parent_path, case, RANS_Cx, RANS_Cy):  # ✓
+    if any(name in case for name in ["FBFS", "IMPJ"]):
         true_tauij = zmc.create_var_dict(["LES_tau"], parent_path, "/" + case + "/", case)
         true_tauij = true_tauij["LES_tau"]
     elif any(name in case for name in ["BUMP", "CBFS", "CNDV", "PHLL", "DUCT"]):
         true_tauij = zmc.create_var_dict(["tau"], parent_path, "/labels/", case)
         true_tauij = true_tauij["tau"]
+    elif any(name in case for name in ["SQCY", "TACY"]):
+        true_tauij = zmc.create_var_dict(["tau"], parent_path, "/labels/", case)
+        true_tauij = true_tauij["tau"]
+        # LES_Cx = zmc.create_var_dict(["x"], parent_path, "/labels/orig/", case)["x"]
+        # LES_Cy = zmc.create_var_dict(["y"], parent_path, "/labels/orig/", case)["y"]
+        # for i in range(RANS_Cx.shape[0]):
+        #     assert RANS_Cx[i] == LES_Cx[i]
+        #     assert RANS_Cy[i] == LES_Cy[i]
     else:
         raise Exception("No matching true tauij for this case")
     return true_tauij
@@ -167,9 +175,10 @@ def load_true_tauij(parent_path, case):  # ✓
 
 def load_data(case):  # ✓
     parent_path = zmc.get_parent_path(case)  # ✓
-    data_dict = zmc.load_marker_data_apr2023(case, parent_path,
-                                             ["Cx", "Cy", "k", "epsilon", "gradU"])  # ✓
-    true_tauij = load_true_tauij(parent_path, case)  # ✓
+    data_dict = zmc.load_marker_data(case, parent_path, ["Cx", "Cy", "k", "epsilon", "gradU"])  # ✓
+    RANS_Cx = data_dict["Cx"]
+    RANS_Cy = data_dict["Cy"]
+    true_tauij = load_true_tauij(parent_path, case, RANS_Cx, RANS_Cy)  # ✓
     return data_dict, true_tauij
 
 
