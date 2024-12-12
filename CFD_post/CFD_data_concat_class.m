@@ -54,10 +54,12 @@ classdef CFD_data_concat_class
             assert(size(LES_data, 2) == obj.num_LES_cols)
             assert(size(LES_data, 3) == obj.num_cases)
             
-            for i = 2:obj.num_cases
-                for j = 1:obj.num_dims
-                    assert(isequal(RANS_data(:, j, 1), RANS_data(:, j, i)))
-                    assert(isequal(LES_data(:, j, 1), LES_data(:, j, i)))
+            if obj.num_cases > 1
+                for i = 2:obj.num_cases
+                    for j = 1:obj.num_dims
+                        assert(isequal(RANS_data(:, j, 1), RANS_data(:, j, i)))
+                        assert(isequal(LES_data(:, j, 1), LES_data(:, j, i)))
+                    end
                 end
             end
         end
