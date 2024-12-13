@@ -137,6 +137,34 @@ classdef bary_map_class
                 plot(x_bary, y_bary, marker, 'MarkerSize', 2+(i*0.15))
             end
         end
+        
+        function mean_coords = calc_mean_coords(coords)
+            % Calculate mean barycentric coords
+            mean_x_bary = mean(coords(:, 1));
+            mean_y_bary = mean(coords(:, 2));
+            mean_coords = cat(2, mean_x_bary, mean_y_bary);
+        end
+        
+        function mean_unit_vec = calc_mean_unit_vec(coords)
+            % Calculate mean unit vector between barycentric coords
+            unit_vecs = [];
+            for i = 2:size(coords, 1)
+                vec = coords(i, :) - coords(i-1, :);
+                unit_vec = vec/sqrt(vec(1, 1).^2 + vec(1, 2).^2);
+                unit_vecs = cat(1, unit_vecs, unit_vec);
+            end
+            mean_unit_vec = [mean(unit_vecs(:, 1)), mean(unit_vecs(:, 2))];
+        end
+        
+        function arrow = incl_arrow(mean_coords, mean_unit_vec)
+            % Calculate the start and end coordinates of an arrow, given a
+            % centrepoint and vector and create the arrow
+            % ** Not used in Oct 2022 PoF paper **
+            start_coords = [mean_coords(1) - (mean_unit_vec(1)/16), ...
+                mean_coords(2) - (mean_unit_vec(2)/16)];
+            arrow = annotation('textarrow');
+            set(arrow, 'parent', gca, 'position', [start_coords, mean_unit_vec/8])
+        end
     end
 end
 
