@@ -295,7 +295,7 @@ class ZonalDataPlotter:
         # Initialise grids
         x_grid = np.tile(uniq_Cx, (ny, 1))
         y_grid = np.tile(np.expand_dims(uniq_Cy, axis=1), (1, nx))
-        z_grid = np.full((ny, nx), np.NaN)
+        z_grid = np.full((ny, nx), np.nan)
 
         # Create dicts with coords as keys and grid indexes as values
         Cx_idx_dict = dict(zip(uniq_Cx, range(uniq_Cx.shape[0])))
@@ -304,6 +304,7 @@ class ZonalDataPlotter:
         for i in range(Cx.shape[0]):
             xi = Cx_idx_dict[Cx[i]]
             yi = Cy_idx_dict[Cy[i]]
+            assert np.isnan(z_grid[yi, xi]) == True
             z_grid[yi, xi] = var[i]
 
         return x_grid, y_grid, z_grid
