@@ -116,11 +116,13 @@ classdef bary_map_class
             end
         end
         
-        function flag_list = plot_bary_coords(bij, A_x, A_y, B_x, B_y, ...
-                C_x, C_y, marker) % ✓
+        function [coords, flag_list] = plot_bary_coords(bij, A_x, A_y, B_x, B_y, ...
+                C_x, C_y, marker, save_coords) % ✓
             % Calculate all x_bary and y_bary coordinates for a mesh line
             % in 3 x 3 format
             flag_list = [];
+            coords = [];
+            
             for i = 1:size(bij, 3)
                 [~, lambda] = eig(bij(:, :, i));
                 [~, idx] = sort(diag(lambda), 'descend');
@@ -128,6 +130,11 @@ classdef bary_map_class
                 [C1, C2, C3] = bary_map_class.calc_coeffs(lambda); % ✓
                 [x_bary, y_bary] = bary_map_class.calc_coords(...
                     C1, A_x, A_y, C2, B_x, B_y, C3, C_x, C_y); % ✓
+                
+                if save_coords == true
+                    coords = cat(1, coords, [x_bary y_bary]);
+                end
+                
                 flag = bary_map_class.find_out_points(x_bary, y_bary, ...
                     A_x, A_y, B_x, B_y, C_x, C_y); % ✓
                 if flag == true
