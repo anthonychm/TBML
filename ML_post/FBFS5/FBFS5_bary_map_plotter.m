@@ -151,6 +151,32 @@ ylim([0 1])
 % xticks(0:0.2:1)
 % yticks(0:0.2:1)
 
+%% Quantitative analysis
+
+% Find mean BM coordinates
+nz_mean_coords = bary_obj.calc_mean_coords(nz_coords);
+z_mean_coords = bary_obj.calc_mean_coords(z_coords);
+RANS_mean_coords = bary_obj.calc_mean_coords(RANS_coords);
+LES_mean_coords = bary_obj.calc_mean_coords(LES_coords);
+
+% Find mean unit vector
+nz_mean_unit_vec = bary_obj.calc_mean_unit_vec(nz_coords);
+z_mean_unit_vec = bary_obj.calc_mean_unit_vec(z_coords);
+RANS_mean_unit_vec = bary_obj.calc_mean_unit_vec(RANS_coords);
+LES_mean_unit_vec = bary_obj.calc_mean_unit_vec(LES_coords);
+
+%% Include mean coordinates in BM
+
+% Include mean coordinates
+plot(nz_mean_coords(1), nz_mean_coords(2), 'k^', ...
+    'MarkerSize', 2+(size(nz_coords, 1)*0.5*0.15), 'LineWidth', 2)
+plot(z_mean_coords(1), z_mean_coords(2), 'ko', ...
+    'MarkerSize', 2+(size(z_coords, 1)*0.5*0.15), 'LineWidth', 2)
+plot(RANS_mean_coords(1), RANS_mean_coords(2), 'ksquare', ...
+    'MarkerSize', 2+(size(RANS_coords, 1)*0.5*0.15), 'LineWidth', 2)
+plot(LES_mean_coords(1), LES_mean_coords(2), 'kdiamond', ...
+    'MarkerSize', 2+(size(LES_coords, 1)*0.5*0.15), 'LineWidth', 2)
+
 %% Test: Plot the three components states ✓
 
 % % One-component state
