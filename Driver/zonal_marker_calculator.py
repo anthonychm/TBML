@@ -5,6 +5,7 @@ Version 1 (for Apr 2023)
 
 import numpy as np
 import matplotlib.pyplot as plt
+import Utils.heuristic_calculator as hc
 
 
 def calc_zonal_markers():
@@ -19,11 +20,15 @@ def calc_zonal_markers():
     var_dict = load_marker_data(case, parent_path, ["S", "R", "k", "epsilon"])  # ✓
     S, R, k, eps = unpack_var_dict_calc(var_dict)  # ✓
     nu = get_nu(case)
-    #nd_Q = calc_nd_Q(S, R)
-    #nd_TI = calc_nd_TI(k, Ux, Uy, Uz)
-    #nd_Ux = calc_nd_Ux(Ux, Uy, Uz)
-    Re_y = calc_Re_y(k, wall_dist, nu)
-    write_vars(case, vars(), "Re_y")  # ✓
+
+    heuristic_calc = hc.HeuristicCalculator
+    # nd_Q = heuristic_calc.calc_nd_Q(S, R)
+    # nd_TI = heuristic_calc.calc_nd_TI(k, Ux, Uy, Uz)
+    # nd_Ux = heuristic_calc.calc_nd_Ux(Ux, Uy, Uz)
+    # Re_y = heuristic_calc.calc_Re_y(k, wall_dist, nu)
+    visc_ratio = heuristic_calc.calc_visc_ratio(k, eps, nu)
+    S_sq_trace, R_sq_trace = calc_two_dim_traces(k, eps, S, R)
+    write_vars(case, vars(), "R_sq_trace")  # ✓
     return
 
 
