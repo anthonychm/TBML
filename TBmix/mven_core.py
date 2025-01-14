@@ -1,6 +1,5 @@
 import numpy as np
 import math
-from scipy.spatial import Voronoi
 import torch
 import torch.nn as nn
 
@@ -425,21 +424,6 @@ class TBMixTVT:
 
         return x_test, tb_test, y_test, pi_all, mu_bij_all, sigma_all, mu_bij_pred
 
-    @staticmethod
-    def find_test_neighbours(test_list, coords_test):
-        # Find neighbouring data points in the flow domain using a Voronoi diagram
-        assert len(test_list) == 1
-        vor = Voronoi(coords_test)
-        pairs = vor.ridge_points
-        neigh_dict = {k: [] for k in range(len(coords_test))}
-
-        # Fill neighbours dictionary {coord_idx:neighbour coord_idx}
-        for p in pairs:
-            neigh_dict[p[0]].append(p[1])
-            neigh_dict[p[1]].append(p[0])
-
-        return neigh_dict
-
     def perform_most_prob_test(self, x_test, tb_test, y_test, model, pi_all, mu_bij_all,
                                sigma_all, mu_bij_pred, enforce_realiz, num_realiz_its,
                                log):
@@ -463,87 +447,6 @@ class TBMixTVT:
 
         avg_nll_loss = running_test_loss / (len(x_test) * 9)
         print(f"Max value of pi = {torch.max(pi_all).item()}")
-
-        # Convert mu_bij_pred to np array and enforce realizability
-        mu_bij_pred = mu_bij_pred.numpy()
-        y_test = y_test.numpy()
-
-        # if enforce_realiz:
-        #     for i in range(num_realiz_its):
-        #         mu_bij_pred = tbnn.calc.PopeDataProcessor.make_realizable(mu_bij_pred)
-
-        # Calculate, print and write testing RMSE
-        test_rmse = self.calc_test_rmse(mu_bij_pred, y_test, log)  # ✓
-
-        # Convert tensors to np arrays to view them
-        pi_all = pi_all.numpy()
-        mu_bij_all = mu_bij_all.numpy()
-        sigma_all = sigma_all.numpy()
-
-        return mu_bij_pred, avg_nll_loss, test_rmse, pi_all, mu_bij_all, sigma_all
-
-    def perform_anchors_test(self, x_test, tb_test, y_test, model, pi_all, mu_bij_all,
-                             sigma_all, mu_bij_pred, neigh_dict, enforce_realiz,
-                             num_realiz_its, log):  #
-        with torch.no_grad():
-            model.eval()
-
-            # First testing round: Find points that have high pi
-            running_test_loss = 0
-            tf_list = [False] * len(x_test)
-            for i in range(len(x_test)):
-                pi, mu_bij, sigma = model(torch.unsqueeze(x_test[i, :], 0),
-                                          torch.unsqueeze(tb_test[i, :, :], 0))  # ✓
-                pi_all[i, :] = pi
-                for k in range(self.num_kernels):
-                    mu_bij_all[k, i, :] = mu_bij[k, :, :]
-                sigma_all[i, :] = sigma
-                loss = self.nll_loss(pi, mu_bij, sigma, y_test[i, :], model) # ✓
-                running_test_loss += loss.item()
-
-                for k, p in enumerate(torch.squeeze(pi)):
-                    if p.item() > 0.7:
-                        assert torch.all(torch.isnan(mu_bij_pred[i, :])).item() is True
-                        mu_bij_pred[i, :] = mu_bij[k, :, :]
-                        tf_list[i] = True
-
-        avg_nll_loss = running_test_loss / (len(x_test) * 9)
-        print(f"Max value of pi = {torch.max(pi_all).item()}")
-
-        # Second testing round: Find points near those from the previous testing round
-        # and choose the closest bij prediction to the points that passed the previous
-        # testing round
-
-        # Find differences between current tf_list and previous tf_list
-        anchor_loops = 0
-        prev_tf_list = [False] * len(x_test)
-        any_false = True
-
-        while any_false:
-            tf_diff = [tf2 - tf1 for (tf1, tf2) in zip(prev_tf_list, tf_list)]
-            if any(tf_diff) is False:
-                raise Exception(f"{sum(tf_list)} points filled out of {len(tf_list)} total"
-                                f" points with no neighbouring points to choose from")
-
-            anchor_loops += 1
-            print(f"Anchor loop {anchor_loops} starting with {sum(tf_list)} filled")
-            prev_tf_list = list(tf_list)
-            for i, tf in enumerate(tf_diff):
-                if tf == 1:
-                    for n in neigh_dict[i]:
-                        if torch.all(torch.isnan(mu_bij_pred[n, :])).item() is False:
-                            continue
-                        else:
-                            assert torch.all(torch.isnan(mu_bij_pred[n, :])).item() is True
-                            mu_bij_diff = mu_bij_pred[i, :].repeat(self.num_kernels, 1) \
-                                - mu_bij_all[:, n, :]
-                            diff_sum = torch.sum(torch.abs(mu_bij_diff), dim=1)
-                            k = torch.argmin(diff_sum).item()
-                            mu_bij_pred[n, :] = mu_bij_all[k, n, :]
-                            tf_list[n] = True
-
-            if all(tf_list) is True:
-                break
 
         # Convert mu_bij_pred to np array and enforce realizability
         mu_bij_pred = mu_bij_pred.numpy()
