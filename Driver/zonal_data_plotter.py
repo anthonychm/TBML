@@ -11,6 +11,7 @@ from numpy import dot
 from numpy.linalg import multi_dot as mdot
 import sys
 import zonal_marker_calculator as zmc
+from Utils.data_dir_methods import DataDirectoryFinder as DDF
 
 
 class ZonalDataPlotter:
@@ -107,7 +108,7 @@ class ZonalDataPlotter:
         Sij, Rij = pdp.calc_Sij_Rij(grad_u, k, eps)
 
         assert len(case_list) == 1
-        parent_path = zmc.get_parent_path(case_list[0])
+        parent_path = DDF(case_list[0]).get_data_dir()
 
         # Calculate Ak
         def extract_gradk(case_list, parent_path):
@@ -151,7 +152,7 @@ class ZonalDataPlotter:
         return invar
 
     def calc_nondim_tau_yy(self, zone, case_list):
-        parent_path = zmc.get_parent_path(case_list[0])
+        parent_path = DDF(case_list[0]).get_data_dir()
         tau_dict = zmc.load_marker_data(case_list[0], parent_path, ["tau"])
         tau_yy = tau_dict["tau"][:, 3]
         k = self.zonal_db_dict[zone][:, 3]

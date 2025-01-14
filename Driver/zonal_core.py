@@ -2,6 +2,7 @@ import copy
 import numpy as np
 import random
 import zonal_marker_calculator as zmc
+from Utils.data_dir_methods import DataDirectoryFinder as DDF
 
 
 class ZonalSplitter:
@@ -15,7 +16,7 @@ class ZonalSplitter:
     def assemble_marker_dict(self, coords_list, marker_list):  # ✓
         # Assemble dictionary containing zonal markers as keys
         for case in self.case_list:
-            parent_path = zmc.get_parent_path(case)  # ✓
+            parent_path = DDF(case).get_data_dir()  # ✓
             coords_dict = zmc.load_marker_data(case, parent_path, coords_list)  # ✓
             self.num_rows_list.append(len(coords_dict["Cx"]))
             for coord in coords_list:
@@ -135,7 +136,7 @@ class OutputCalculator:
     def create_rans_k_normalizer_dict(self):  # ✓
         # Create dictionary of normalization scalars for each case for LES k
         for case in self.k_normzr_dict:
-            parent_path = zmc.get_parent_path(case)  # ✓
+            parent_path = DDF(case).get_data_dir()  # ✓
             data_dict = zmc.load_marker_data(case, parent_path, ["k"])  # ✓
             self.k_normzr_dict[case] = max(data_dict["k"])
 
@@ -174,7 +175,7 @@ def load_true_tauij(parent_path, case, RANS_Cx, RANS_Cy):  # ✓
 
 
 def load_data(case):  # ✓
-    parent_path = zmc.get_parent_path(case)  # ✓
+    parent_path = DDF(case).get_data_dir()  # ✓
     data_dict = zmc.load_marker_data(case, parent_path, ["Cx", "Cy", "k", "epsilon", "gradU"])  # ✓
     RANS_Cx = data_dict["Cx"]
     RANS_Cy = data_dict["Cy"]

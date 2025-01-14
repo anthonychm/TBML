@@ -6,6 +6,7 @@ Version 1 (for Apr 2023)
 import numpy as np
 import matplotlib.pyplot as plt
 import Utils.heuristic_calculator as hc
+from Utils.data_dir_methods import DataDirectoryFinder as DDF
 
 
 def calc_zonal_markers():
@@ -16,7 +17,7 @@ def calc_zonal_markers():
     # "FBFS_1800", "FBFS_3600", "FBFS_4500", "FBFS_5400", "FBFS_7200"
     case = "FBFS_7200"
 
-    parent_path = get_parent_path(case)
+    parent_path = DDF(case).get_data_dir()
     var_dict = load_marker_data(case, parent_path, ["S", "R", "k", "epsilon"])  # ✓
     S, R, k, eps = unpack_var_dict_calc(var_dict)  # ✓
     nu = get_nu(case)
@@ -235,10 +236,10 @@ def plot_zonal_markers(Cx, Cy, marker, marker_dict):
 
 def check_zonal_markers():
     # Plot zonal markers to check them against ParaView iso-volumes  ✓
-    case = "FBFS_7200"
-    marker = "Re_y"  # nd_Q, nd_TI, nd_Ux, Re_y
-    parent_path = get_parent_path(case)
-    coords_dict = load_marker_data_apr2023(case, parent_path, ["Cx", "Cy", "Cz"])
+    case = "PHLL_case_1p5"
+    marker = "R_sq_trace"  # nd_Q, nd_TI, nd_Ux, Re_y
+    parent_path = DDF(case).get_data_dir()
+    coords_dict = load_marker_data(case, parent_path, ["Cx", "Cy"])
     Cx = coords_dict["Cx"]
     Cy = coords_dict["Cy"]
     Cz = coords_dict["Cz"]
