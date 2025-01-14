@@ -39,7 +39,10 @@ class HeuristicCalculator:
         # Calculate turbulence Reynolds number, Re_y = sqrt(k)*d/(const*nu) ✓
         Re_y = (np.sqrt(k) * wall_dist) / (const * nu)
         if min_lim is True:  # min(Re_y, min_lim_var)
-            Re_y = min(Re_y, min_lim_var)
+            Re_y = np.expand_dims(Re_y, axis=1)
+            min_lim_col = np.full((len(Re_y), 1), min_lim_var)
+            Re_y = np.hstack((Re_y, min_lim_col))
+            Re_y = np.min(Re_y, axis=1)
         return Re_y
 
     @staticmethod
