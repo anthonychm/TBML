@@ -75,3 +75,59 @@ class HeuristicCalculator:
         # Calculate viscosity ratio, r_nu = nut/((100*nu) + nut) ✓
         nut = C_mu * (k ** 2)/eps
         return nut/((100*nu) + nut)
+
+    @staticmethod
+    def calc_gradp_streamline(Ux, Uy, Uz, gradPx, gradPy, gradPz):
+        # Calculate pressure gradient along streamline
+        top = (Ux*gradPx) + (Uy*gradPy) + (Uz*gradPz)
+        root = 0
+        for gradP_comp in [gradPx, gradPy, gradPz]:
+            for U_comp in [Ux, Uy, Uz]:
+                root += (gradP_comp ** 2)*(U_comp ** 2)
+        return top/(np.sqrt(root) + abs(top))
+
+    @staticmethod
+    def calc_time_scale_ratio(S, k, eps):
+        # Calculate ratio of turbulent time scale to mean strain time scale
+        norm_S = VariableCalculator.calc_frob_norm(S)
+        return norm_S*k/((norm_S*k) + eps)
+
+    @staticmethod
+    def calc_k_ratio(Ux, Uy, Uz, gradkx, gradky, gradkz, k, eps, S):
+        # Calculate ratio of convection to production of turbulent kinetic energy
+        tauij = VariableCalculator.calc_bh_tauij(k, eps, S)
+        top = (Ux*gradkx) + (Uy*gradky) + (Uz*gradkz)
+        bot = np.zeros(len(S, ))
+        for row in range(len(bot)):
+            for i in range(3):
+                for j in range(3):
+                    bot[row] += tauij[row, i, j] * S[row, i, j]
+        bot = abs(bot) + top
+        return top/bot
+
+    @staticmethod
+    def calc_Re_stress_ratio(k, eps, S):
+        # Calculate ratio of total Reynolds stresses to normal Reynolds stresses
+        tauij = VariableCalculator.calc_bh_tauij(k, eps, S)
+        norm_tauij = VariableCalculator.calc_frob_norm(tauij)
+        return norm_tauij/(k+norm_tauij)
+
+
+class MiscMethods:
+    @staticmethod
+    def get_nu(case):
+        # Get kinematic viscosity, nu for a specified case ✓
+        nu_dict = {
+            "PHLL": 5e-6,
+            "BUMP": 2.53e-5,
+            "CNDV_12600": 7.94e-5,
+            "CNDV_20580": 4.86e-5,
+            "CBFS": 7.3e-5,
+            "DUCT": 6.89e-05,
+            "FBFS": 1e-5,
+            "IMPJ": 1.5e-5
+        }
+
+        for key in nu_dict:
+            if key in case:
+                return nu_dict[key]
