@@ -44,20 +44,10 @@ class VariableCalculator:
 class HeuristicCalculator:
     @staticmethod
     def calc_nd_Q(S, R):
-        # Calculate non-dim Q-criterion, nd_Q = (||R||^2 - ||S||^2)/(||R||^2 + ||S||^2) ✓
-        nd_Q = []
-        for row in range(S.shape[0]):
-            norm_S = 0
-            norm_R = 0
-            for i in range(2):
-                for j in range(2):
-                    norm_S += S[row, i, j] ** 2
-                    norm_R += R[row, i, j] ** 2
-            norm_S = np.sqrt(norm_S)
-            norm_R = np.sqrt(norm_R)
-            nd_Q_tmp = ((norm_R ** 2) - (norm_S ** 2)) / ((norm_R ** 2) + (norm_S ** 2))
-            nd_Q.append(nd_Q_tmp)
-        return nd_Q
+        # Calculate non-dim Q-criterion, nd_Q = (||R||^2 - ||S||^2)/(||R||^2 + ||S||^2)
+        norm_S = VariableCalculator.calc_frob_norm(S)
+        norm_R = VariableCalculator.calc_frob_norm(R)
+        return ((norm_R ** 2) - (norm_S ** 2)) / ((norm_R ** 2) + (norm_S ** 2))
 
     @staticmethod
     def calc_nd_ti(k, Ux, Uy, Uz):
