@@ -4,6 +4,41 @@ data-driven RANS turbulence modelling.
 """
 
 import numpy as np
+from Utils.reformatter import Reformatter
+
+
+class VariableCalculator:
+    @staticmethod
+    def calc_frob_norm(var):
+        norm_var = np.zeros(len(var, ))
+        for i in range(3):
+            for j in range(3):
+                norm_var += var[:, i, j] ** 2
+        return np.sqrt(norm_var)
+
+    @staticmethod
+    def calc_bh_tauij(k, eps, S, C_mu=0.09):
+        # Calculate Reynolds stress based on Boussinesq Hypothesis
+        nut = C_mu*(k ** 2)/eps
+        nut = np.expand_dims(nut, axis=(1, 2))
+        tauij = 2*nut*S
+        for i in range(3):
+            for j in range(3):
+                if i == j:
+                    tauij[:, i, j] -= (2/3)*k
+        return tauij
+
+    @staticmethod
+    def calc_S_and_R(gradU):
+        # Calculate dimensional mean strain rate S and mean rotation rate R, dim = [1/s] ✓
+        if gradU.ndim == 2:
+            gradU = Reformatter.flat_tensor_to_tensor(gradU)
+        S = np.full((len(gradU), 3, 3), np.nan)
+        R = np.full((len(gradU), 3, 3), np.nan)
+        for i in range(len(gradU)):
+            S[i, :, :] = 0.5 * (gradU[i, :, :] + np.transpose(gradU[i, :, :]))
+            R[i, :, :] = 0.5 * (gradU[i, :, :] - np.transpose(gradU[i, :, :]))
+        return S, R
 
 
 class HeuristicCalculator:
