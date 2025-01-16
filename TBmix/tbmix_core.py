@@ -134,24 +134,6 @@ class TBMix(nn.Module):
         # Calculate mean anisotropy mu_bij
         mu_bij_batch = torch.full((self.num_kernels, x.shape[0], 9), torch.nan)
 
-        def sig_clip(mu_bij):
-            # Use modified sigmoid to clip bij for realizability
-            for comp, val in enumerate(mu_bij.tolist()):
-                # Clip mu_bij value magnitude for exponential operation
-                if val < -21.4:
-                    val = -21.4
-
-                # Clip mu_bij value using modified sigmoid
-                if comp in [0, 4, 8]:
-                    mu_bij[comp] = (1/(1 + math.exp(-val))) - (1/3)
-                    assert -1/3 <= mu_bij[comp] <= 2/3
-                elif comp in [1, 2, 3, 5, 6, 7]:
-                    mu_bij[comp] = (1/(1 + math.exp(-val))) - (1/2)
-                    assert -1/2 <= mu_bij[comp] <= 1/2
-                else:
-                    raise Exception('Anisotropy component index invalid')
-            return mu_bij
-
         for k in range(self.num_kernels):
             for data_point in range(x.shape[0]):
                 mu_bij = torch.matmul(g_coeffs[k, data_point, :], tb[data_point].float())
@@ -162,7 +144,6 @@ class TBMix(nn.Module):
 
                 # mu_bij_batch[k, data_point, :] = mu_bij
                 mu_bij_batch[k, data_point, :] = torch.tanh(mu_bij)
-                # mu_bij_batch[k, data_point, :] = sig_clip(mu_bij)
 
         # Multiply std dev by three as bij has three terms, each with std dev = sigma
         sigma = 3*sigma
