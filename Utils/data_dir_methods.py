@@ -26,7 +26,7 @@ class DataDirectoryFinder:
         if any(name in self.case for name in ["FBFS", "IMPJ"]):
             return {"rans": self.dir + '/' + self.case + '/',
                     "zonal": self.dir + '/zonal criteria/',
-                    "labels": self.dir + '/' + self.case + '/'}
+                    "labels": self.dir + '/labels/'}
         elif any(name in self.case for name in ["BUMP", "CBFS", "CNDV", "PHLL", "DUCT"]):
             return {"rans": self.dir + '/' + turb_model + '/' + turb_model + '_',
                     "zonal": self.dir + '/' + turb_model + '/zonal criteria/',
