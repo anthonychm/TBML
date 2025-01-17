@@ -73,6 +73,16 @@ class TBMix(nn.Module):
         self.z_mu_g3 = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
         self.z_sigma = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
 
+        # Further hidden layer outputs if 3D tensor basis is used
+        if self.structure.num_tensor_basis == 10:
+            self.z_mu_g4 = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
+            self.z_mu_g5 = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
+            self.z_mu_g6 = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
+            self.z_mu_g7 = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
+            self.z_mu_g8 = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
+            self.z_mu_g9 = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
+            self.z_mu_g10 = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
+
         # Include hidden layer outputs for t0_gen if required
         if self.incl_t0_gen is True:
             self.z_mu_g01 = nn.Linear(self.structure.num_hid_nodes[-1], self.num_kernels)
@@ -115,12 +125,31 @@ class TBMix(nn.Module):
         # sigma = torch.exp(self.z_sigma(z_h))  # Tensor (batch size, num kernels)
         sigma = nn.ELU()(self.z_sigma(z_h)) + 1 + 1e-15
 
+        if self.structure.num_tensor_basis == 10:
+            mu_g4 = self.z_mu_g4(z_h)  # Tensor (batch size, num kernels)
+            mu_g5 = self.z_mu_g5(z_h)  # Tensor (batch size, num kernels)
+            mu_g6 = self.z_mu_g6(z_h)  # Tensor (batch size, num kernels)
+            mu_g7 = self.z_mu_g7(z_h)  # Tensor (batch size, num kernels)
+            mu_g8 = self.z_mu_g8(z_h)  # Tensor (batch size, num kernels)
+            mu_g9 = self.z_mu_g9(z_h)  # Tensor (batch size, num kernels)
+            mu_g10 = self.z_mu_g10(z_h)  # Tensor (batch size, num kernels)
+
         # Rewrite mean g coefficients in (num kernels, batch size, num coefficients) form
-        g_coeffs = torch.full((self.num_kernels, x.shape[0], 3), torch.nan)
+        g_coeffs = torch.full((self.num_kernels, x.shape[0],
+                               self.structure.num_tensor_basis), torch.nan)
         for k in range(self.num_kernels):
             g_coeffs[k, :, 0] = mu_g1[:, k]
             g_coeffs[k, :, 1] = mu_g2[:, k]
             g_coeffs[k, :, 2] = mu_g3[:, k]
+
+            if self.structure.num_tensor_basis == 10:
+                g_coeffs[k, :, 3] = mu_g4[:, k]
+                g_coeffs[k, :, 4] = mu_g5[:, k]
+                g_coeffs[k, :, 5] = mu_g6[:, k]
+                g_coeffs[k, :, 6] = mu_g7[:, k]
+                g_coeffs[k, :, 7] = mu_g8[:, k]
+                g_coeffs[k, :, 8] = mu_g9[:, k]
+                g_coeffs[k, :, 9] = mu_g10[:, k]
 
         if self.incl_t0_gen is True:
             mu_g01 = self.z_mu_g01(z_h)  # Tensor (batch size, num kernels)
@@ -145,8 +174,8 @@ class TBMix(nn.Module):
                 # mu_bij_batch[k, data_point, :] = mu_bij
                 mu_bij_batch[k, data_point, :] = torch.tanh(mu_bij)
 
-        # Multiply std dev by three as bij has three terms, each with std dev = sigma
-        sigma = 3*sigma
+        # Multiply std by number of terms in calculating bij, each with std = sigma
+        sigma = self.structure.num_tensor_basis*sigma
 
         return pi, mu_bij_batch, sigma
 
