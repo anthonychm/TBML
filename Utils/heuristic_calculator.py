@@ -102,7 +102,7 @@ class HeuristicCalculator:
             for i in range(3):
                 for j in range(3):
                     bot[row] += tauij[row, i, j] * S[row, i, j]
-        bot = abs(bot) + top
+        bot = abs(bot) + abs(top)
         return top/bot
 
     @staticmethod
