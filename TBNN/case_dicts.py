@@ -5,7 +5,9 @@ def get_metadata(dataset_name):
                 "PHLL4_dataset.txt": phll4(),
                 "CHAN7_no_oti_half_dataset.txt": half_chan7_no_oti(),
                 "CHAN7_with_interps_half_dataset.txt": half_chan7_with_interps(),
-                "CHAN7_no_oti_with_interps_half_dataset.txt": half_chan7_no_oti_with_interps()}
+                "CHAN7_no_oti_with_interps_half_dataset.txt":
+                    half_chan7_no_oti_with_interps(),
+                "MVEN6_dataset.txt": mven6()}
     return ref_dict[dataset_name]
 
 
@@ -61,5 +63,13 @@ def half_chan7_no_oti_with_interps():
     keys = [180, 290, 395, 490, 590, 760, 945]
     num_points = 400
     case_dict = dict.fromkeys(keys, num_points)
+    num_skip_rows = 1
+    return case_dict, num_points, num_skip_rows
+
+
+def mven6():
+    keys = [0.5, 1.0, 1.2, 1.5, 3600, 3500]
+    num_points = [14751, 14751, 14751, 14751, 80296, 9216]
+    case_dict = dict(zip(keys, num_points))
     num_skip_rows = 1
     return case_dict, num_points, num_skip_rows
