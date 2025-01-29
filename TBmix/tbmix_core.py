@@ -269,7 +269,6 @@ class TBMixTVT:
         running_train_loss = 0
         batch_idx = 0
         skip_batch_idx = [0]*len(train_loader)
-        num_points = 0
 
         for x, tb, y in train_loader:
             # Forward propagation
@@ -299,9 +298,8 @@ class TBMixTVT:
 
             # Sum MNLL loss
             running_train_loss += loss.item()
-            num_points += x.shape[0]
 
-        # Print skipped batches in current epoch
+        # Print skipped batches
         skip_batch_idx = list(filter(None, skip_batch_idx))
         if skip_batch_idx:
             print(f"Epoch {epoch_count} skipped batches {skip_batch_idx} due to low "
@@ -356,7 +354,6 @@ class TBMixTVT:
         running_valid_loss = 0
         batch_idx = 0
         skip_batch_idx = [0]*len(valid_loader)
-        num_points = 0
         max_pi = 0
 
         with torch.no_grad():
@@ -376,7 +373,6 @@ class TBMixTVT:
 
                 # Sum MNLL loss
                 running_valid_loss += loss.item()
-                num_points += x.shape[0]
 
                 # Update max pi
                 if torch.max(pi).item() > max_pi:
