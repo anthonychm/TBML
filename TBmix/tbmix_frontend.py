@@ -110,7 +110,7 @@ def tbmix_main(dataset, case_dict, incl_zonal_markers=False, num_zonal_markers=0
                                  num_zonal_markers, two_invars, incl_p_invars,
                                  incl_tke_invars, incl_input_markers,
                                  incl_zonal_markers, rho, num_tensor_basis,
-                                 enforce_realiz, num_realiz_its, nu)  # ✓
+                                 enforce_realiz, num_realiz_its)  # ✓
     user_vars = locals()
     current_folder = \
         tbmix_piter.trial_iter(num_seeds, coords, x, tb, y, train_list, valid_list,
