@@ -223,10 +223,10 @@ class TBMixTVT:
                                                   epoch_count)  # ✓
             train_loss_list.append(avg_train_loss)
 
-            # Print average training NLL loss per data point per bij component
+            # Print average training MNLL loss per batch
             if epoch_count % self.print_freq == 0:
-                print(f"Epoch = {epoch_count}, Average training NLL loss per "
-                      f"data point per bij component = {avg_train_loss}")
+                print(f"Epoch = {epoch_count}, Average training MNLL loss per "
+                      f"batch = {avg_train_loss}")
 
             # Evaluate model on validation data for early stopping
             if epoch_count % self.interval == 0:
@@ -237,9 +237,9 @@ class TBMixTVT:
                 continue_train = self.check_conv(valid_loss_list, self.avg_interval,
                                                  epoch_count)  # ✓
 
-                # Print average validation NLL loss per data point per bij component
-                print(f"Epoch = {epoch_count}, Average validation NLL loss per "
-                      f"data point per bij component = {avg_valid_loss}")
+                # Print average validation MNLL loss per batch
+                print(f"Epoch = {epoch_count}, Average validation MNLL loss per batch = "
+                      f"{avg_valid_loss}")
                 print("------------------------------------------------------------")
 
                 if continue_train is False:
@@ -253,7 +253,7 @@ class TBMixTVT:
             # Update learning rate
             self.lr_scheduler.step()
 
-        # Print final avg train and valid NLL loss per data point per bij component
+        # Print final avg train and valid MNLL loss per batch
         self.post_train_print(self.log, epoch_count, train_loss_list[-1],
                               valid_loss_list[-1])  # ✓
 
@@ -283,11 +283,8 @@ class TBMixTVT:
                 skip_batch_idx[batch_idx-1] = batch_idx
                 continue
 
-            # Clip (i.e., clamp) sigma to avoid infinite loss
-            # sigma = torch.clamp(sigma, min=1e-50)
-
-            # Calculate and check total NLL loss for current batch
-            loss = self.nll_loss(pi, mu_bij, sigma, y, model)  # ✓
+            # Calculate mean negative log likelihood loss for current batch
+            loss = self.mnll_loss(pi, mu_bij, sigma, y, model)  # ✓
             if torch.isnan(loss).item() is True:
                 raise Exception("NaN loss detected")
             if torch.isinf(loss).item() is True:
@@ -300,7 +297,7 @@ class TBMixTVT:
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 5e-5)
             optimizer.step()
 
-            # Sum NLL loss for current epoch
+            # Sum MNLL loss
             running_train_loss += loss.item()
             num_points += x.shape[0]
 
@@ -312,37 +309,36 @@ class TBMixTVT:
             print(f"Epoch {epoch_count}: {len(skip_batch_idx)} / {len(train_loader)} "
                   f"batches skipped")
 
-        # Return average NLL loss per data point per bij component for each epoch
-        return running_train_loss / (num_points * 9)
+        # Return MNLL loss per batch
+        return running_train_loss / (len(train_loader) - len(skip_batch_idx))
 
-    def nll_loss(self, pi, mu_bij_batch, sigma, y, model, log=True, reg=None):
+    def mnll_loss(self, pi, mu_bij_batch, sigma, y, model, log=True, reg=None):
         # Make y, sigma, and pi have same dimensions as mu_bij_batch
         y = y.unsqueeze(0).repeat(self.num_kernels, 1, 1)
         sigma = torch.transpose(sigma, 0, 1).unsqueeze(2).repeat(1, 1, 9)
         pi = torch.transpose(pi, 0, 1).unsqueeze(2).repeat(1, 1, 9)
+        c = 9  # Number of output variables
 
         # Calculate distribution difference
         diff = (y - mu_bij_batch) * torch.reciprocal(sigma)
         diff = 0.5 * torch.square(diff)
 
-        if log is True:
+        if log is True and self.num_kernels == 1:
             # Calculate loss in the log domain
-            log_gauss_diff = -torch.log(sigma) - (0.5*math.log(2*np.pi)) - diff
-            log_mix_prob = torch.log(pi)
-            nll_loss = torch.logsumexp(log_mix_prob + log_gauss_diff, dim=0)
-            nll_loss = -1 * torch.mean(nll_loss)
+            part_1 = (1/2)*math.log(2*np.pi)
+            part_2 = (1/y.shape[1])*torch.sum(torch.log(sigma[0, :, 0]))
+            part_3 = (1/(y.shape[1]*9))*torch.sum(diff)
+            nll_loss = part_1 + part_2 + part_3
         else:
             # Calculate loss in standard manner
-            frac = 1.0 / np.sqrt(2.0 * np.pi)
-            gauss_diff = frac * torch.reciprocal(sigma) * torch.exp(-diff)
+            frac = 1.0 / (2.0 * np.pi)**(c/2)
+            gauss_diff = frac * torch.reciprocal(torch.pow(sigma, c)) * torch.exp(-diff)
             assert torch.all(gauss_diff >= 0).tolist() is True
 
             # Calculate negative log-likelihood loss
             nll_loss = torch.sum(pi * gauss_diff, dim=0)  # sum over kernels
             nll_loss = -torch.log(nll_loss)
             nll_loss = torch.mean(nll_loss)
-            # nll_loss = -torch.sum(torch.sum(nll_loss, dim=0))  # sum over batch and bij
-            # comps
 
         # Calculate L2 regularization and return combined loss, else return nll loss
         if reg == "l2":
@@ -370,15 +366,15 @@ class TBMixTVT:
                 batch_idx += 1
                 pi, mu_bij, sigma = model(x, tb)  # ✓
 
-                # Calculate and check total NLL loss for current batch
-                loss = self.nll_loss(pi, mu_bij, sigma, y, model)  # ✓
+                # Calculate MNLL loss for current batch
+                loss = self.mnll_loss(pi, mu_bij, sigma, y, model)  # ✓
                 if torch.isnan(loss).item() is True:  # Check for loss = nan
                     raise Exception("NaN loss detected")
                 if torch.isinf(loss).item() is True:  # Check for loss = inf
                     skip_batch_idx[batch_idx-1] = batch_idx
                     continue
 
-                # Sum total NLL loss
+                # Sum MNLL loss
                 running_valid_loss += loss.item()
                 num_points += x.shape[0]
 
@@ -393,8 +389,8 @@ class TBMixTVT:
             print(f"Epoch {epoch_count}: {len(skip_batch_idx)} / {len(valid_loader)} "
                   f"batches skipped")
 
-        # Return average NLL loss per data point per bij component for current epoch
-        return running_valid_loss / (num_points * 9), max_pi
+        # Return average MNLL loss per batch
+        return running_valid_loss / (len(valid_loader) - len(skip_batch_idx)), max_pi
 
     def check_conv(self, valid_loss_list, avg_interval, epoch_count):  #
         # Activate early stopping if validation error starts increasing
@@ -406,19 +402,18 @@ class TBMixTVT:
 
     @staticmethod
     def post_train_print(log, epoch_count, final_avg_train_loss, final_avg_valid_loss):  #
-        # Print average NLL losses per data point per bij component in console
+        # Print average MNLL losses per batch in console
         print("============================================================")
-        print(f"Total number of epochs = {epoch_count}, Final average training NLL loss "
-              f"per data point per bij component = {final_avg_train_loss},"
-              f"Final average validation NLL loss per data point per bij component = "
-              f"{final_avg_valid_loss}")
+        print(f"Total number of epochs = {epoch_count}, "
+              f"Final average training MNLL loss per batch = {final_avg_train_loss},"
+              f"Final average validation MNLL loss per batch = {final_avg_valid_loss}")
 
-        # Print average NLL losses per data point per bij component in log file
+        # Print average MNLL losses per batch in log file
         with open(log, "a") as write_file:
             print("Total number of epochs = ", epoch_count, file=write_file)
-            print("Final average training NLL loss per data point per bij component = ",
+            print("Final average training MNLL loss per batch = ",
                   final_avg_train_loss, file=write_file)
-            print("Final average validation NLL loss per data point per bij component = ",
+            print("Final average validation MNLL loss per batch = ",
                   final_avg_valid_loss, file=write_file)
 
     def test_preprocessing(self, x_test, tb_test, y_test):
@@ -465,13 +460,13 @@ class TBMixTVT:
                 for k in range(self.num_kernels):
                     mu_bij_all[k, i, :] = mu_bij[k, :, :]
                 sigma_all[i, :] = sigma
-                loss = self.nll_loss(pi, mu_bij, sigma, y_test[i, :], model) # ✓
+                loss = self.mnll_loss(pi, mu_bij, sigma, y_test[i, :], model) # ✓
                 running_test_loss += loss.item()
 
                 k = torch.argmax(pi).item()
                 mu_bij_pred[i, :] = mu_bij[k, :, :]
 
-        avg_nll_loss = running_test_loss / (len(x_test) * 9)
+        avg_mnll_loss = running_test_loss / len(x_test)
         print(f"Max value of pi = {torch.max(pi_all).item()}")
 
         # Convert mu_bij_pred to np array and enforce realizability
@@ -490,7 +485,7 @@ class TBMixTVT:
         mu_bij_all = mu_bij_all.numpy()
         sigma_all = sigma_all.numpy()
 
-        return mu_bij_pred, avg_nll_loss, test_rmse, pi_all, mu_bij_all, sigma_all
+        return mu_bij_pred, avg_mnll_loss, test_rmse, pi_all, mu_bij_all, sigma_all
 
     def perform_anchors_test(self, x_test, tb_test, y_test, model, pi_all, mu_bij_all,
                              sigma_all, mu_bij_pred, neigh_dict, enforce_realiz,
@@ -508,7 +503,7 @@ class TBMixTVT:
                 for k in range(self.num_kernels):
                     mu_bij_all[k, i, :] = mu_bij[k, :, :]
                 sigma_all[i, :] = sigma
-                loss = self.nll_loss(pi, mu_bij, sigma, y_test[i, :], model) # ✓
+                loss = self.mnll_loss(pi, mu_bij, sigma, y_test[i, :], model) # ✓
                 running_test_loss += loss.item()
 
                 for k, p in enumerate(torch.squeeze(pi)):

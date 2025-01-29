@@ -82,9 +82,9 @@ def trial_iter(num_seeds, coords, x, tb, y, train_list, valid_list, test_list,
         # Set up results logs, lists and files
         current_folder, log = tbnn.write.init_log(folder_path, seed)  # ✓
         if seed == 1:
-            final_train_avg_nll_loss_list = [None]*num_seeds
-            final_valid_avg_nll_loss_list = [None]*num_seeds
-            test_avg_nll_loss_list = [None]*num_seeds
+            final_train_avg_mnll_loss_list = [None]*num_seeds
+            final_valid_avg_mnll_loss_list = [None]*num_seeds
+            test_avg_mnll_loss_list = [None]*num_seeds
             test_rmse_list = [None]*num_seeds
             tbnn.write.write_param_txt(current_folder, folder_path, user_vars) # ✓
             tbnn.write.write_param_csv(current_folder, folder_path, user_vars, model='tbmix')  # ✓
@@ -116,19 +116,19 @@ def trial_iter(num_seeds, coords, x, tb, y, train_list, valid_list, test_list,
                                      current_folder)  # ✓
         tbmix_writer.write_all_mixture_results(coords_test, folder_path, seed, pi_all,
                                                mu_bij_all, sigma_all, current_folder)  # ✓
-        final_train_avg_nll_loss_list[seed-1] = train_loss_list[-1]
-        final_valid_avg_nll_loss_list[seed-1] = valid_loss_list[-1]
-        test_avg_nll_loss_list[seed-1] = avg_nll_loss
+        final_train_avg_mnll_loss_list[seed-1] = train_loss_list[-1]
+        final_valid_avg_mnll_loss_list[seed-1] = valid_loss_list[-1]
+        test_avg_mnll_loss_list[seed-1] = avg_nll_loss
         test_rmse_list[seed-1] = test_rmse
 
     # Write results for each trial
-    tbmix_writer.write_trial_loss_csv(final_train_avg_nll_loss_list,
-                                      final_valid_avg_nll_loss_list,
-                                      test_avg_nll_loss_list, test_rmse_list,
+    tbmix_writer.write_trial_loss_csv(final_train_avg_mnll_loss_list,
+                                      final_valid_avg_mnll_loss_list,
+                                      test_avg_mnll_loss_list, test_rmse_list,
                                       folder_path, current_folder)  # ✓
-    tbmix_writer.write_loss_means_csv(final_train_avg_nll_loss_list,
-                                      final_valid_avg_nll_loss_list,
-                                      test_avg_nll_loss_list, test_rmse_list,
+    tbmix_writer.write_loss_means_csv(final_train_avg_mnll_loss_list,
+                                      final_valid_avg_mnll_loss_list,
+                                      test_avg_mnll_loss_list, test_rmse_list,
                                       folder_path, current_folder)  # ✓
 
     return current_folder

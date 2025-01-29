@@ -27,19 +27,19 @@ def write_all_mixture_results(coords_test, folder_path, seed, pi_all, mu_bij_all
                             '_sigma.txt'), sigma_all, delimiter=' ', header="Cx Cy sigma")
 
 
-def write_trial_loss_csv(final_train_avg_nll_loss_list, final_valid_avg_nll_loss_list,
-                         test_avg_nll_loss_list, test_rmse_list, folder_path,
+def write_trial_loss_csv(final_train_avg_mnll_loss_list, final_valid_avg_mnll_loss_list,
+                         test_avg_mnll_loss_list, test_rmse_list, folder_path,
                          current_folder):  #
     # Create list of random seeds used in current trial
-    seed_list = [*range(len(final_train_avg_nll_loss_list))]
+    seed_list = [*range(len(final_train_avg_mnll_loss_list))]
     seed_list_plus = [seed + 1 for seed in seed_list]
 
     # Create pandas dataframe of loss and rmse lists
     trial_loss_csv = \
         pd.DataFrame(data={"Random seed": seed_list_plus,
-                           "Final training loss": final_train_avg_nll_loss_list,
-                           "Final validation loss": final_valid_avg_nll_loss_list,
-                           "Testing loss": test_avg_nll_loss_list,
+                           "Final training loss": final_train_avg_mnll_loss_list,
+                           "Final validation loss": final_valid_avg_mnll_loss_list,
+                           "Testing loss": test_avg_mnll_loss_list,
                            "Testing rmse": test_rmse_list})
 
     # Specify order of columns in pandas dataframe
@@ -52,13 +52,13 @@ def write_trial_loss_csv(final_train_avg_nll_loss_list, final_valid_avg_nll_loss
                                        + '_loss_results.csv'), sep=',', index=False)
 
 
-def write_loss_means_csv(final_train_avg_nll_loss_list, final_valid_avg_nll_loss_list,
-                         test_avg_nll_loss_list, test_rmse_list, folder_path,
+def write_loss_means_csv(final_train_avg_mnll_loss_list, final_valid_avg_mnll_loss_list,
+                         test_avg_mnll_loss_list, test_rmse_list, folder_path,
                          current_folder):  #
     # Calculate means and store them in a dictionary
-    means_dict = {"Mean_final_train_avg_nll_loss": np.mean(final_train_avg_nll_loss_list),
-                  "Mean_final_valid_avg_nll_loss": np.mean(final_valid_avg_nll_loss_list),
-                  "Mean_testing_avg_nll_loss": np.mean(test_avg_nll_loss_list),
+    means_dict = {"Mean_final_train_avg_mnll_loss": np.mean(final_train_avg_mnll_loss_list),
+                  "Mean_final_valid_avg_mnll_loss": np.mean(final_valid_avg_mnll_loss_list),
+                  "Mean_testing_avg_mnll_loss": np.mean(test_avg_mnll_loss_list),
                   "Mean_testing_rmse": np.mean(test_rmse_list)}
 
     # Write means in Trial_parameter_and_means.csv database
