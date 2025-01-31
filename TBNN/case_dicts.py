@@ -68,8 +68,8 @@ def half_chan7_no_oti_with_interps():
 
 
 def mven6():
-    keys = [0.5, 1.0, 1.2, 1.5, 3600, 3500]
-    num_points = [14751, 14751, 14751, 14751, 80296, 9216]
+    keys = [0.5, 1.0, 1.2, 1.5, 3500, 3600]
+    num_points = [14751, 14751, 14751, 14751, 9216, 80296]
     case_dict = dict(zip(keys, num_points))
     num_skip_rows = 1
     return case_dict, num_points, num_skip_rows
