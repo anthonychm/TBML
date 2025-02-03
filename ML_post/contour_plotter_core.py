@@ -83,10 +83,9 @@ class ResultsLoader:
         return rans_result[start_row:end_row, self.num_coords:self.num_coords+9]
 
     def extract_true_bij(self, true_result):
-        true_tauij = true_result[:, -9:]
-        true_bij = PopeDataProcessor.calc_true_output(true_tauij, output_var="bij")
         start_row, end_row = self.calc_start_end()
-        return true_bij[start_row:end_row, :]
+        true_tauij = true_result[start_row:end_row, -9:]
+        return PopeDataProcessor.calc_true_output(true_tauij, output_var="bij")
 
 
 class ContourPlotter:
