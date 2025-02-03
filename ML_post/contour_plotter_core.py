@@ -48,7 +48,7 @@ class ResultsLoader:
         return np.loadtxt("../Datasets/" + self.dataset + "_dataset.txt", skiprows=1)
 
     def load_rans_results(self):
-        return np.loadtxt("../Datasets/RANS ref tables/" + self.dataset +
+        return np.loadtxt("../Datasets/RANS_ref_tables/" + self.dataset +
                           "_rans_ref_table.txt", skiprows=1)
 
     def calc_start_end(self):
