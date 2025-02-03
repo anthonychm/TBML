@@ -15,6 +15,7 @@ kernel: None or int = 1
 dataset: str = "PHLL4"
 case: str = "PHLL_case_1p2"
 plot_var_name: str = "sigma"  # bij, mix_coeff or sigma
+num_coords: int = 3
 
 # Initialise results loader and load results
 loader = cpc.ResultsLoader(locals())
@@ -34,7 +35,7 @@ elif model == "TBNN":
     # Load TBNN coordinates and bij array
     loader.declare_ml_results_path()
     tbnn_result = loader.load_tbnn_results()
-    coords, arr = tbnn_result[:, :2], tbnn_result[:, 2:]
+    coords, arr = tbnn_result[:, :num_coords], tbnn_result[:, num_coords:]
 
 elif model == "TBmix":
     # Load TBmix coordinates and array of variable for plotting
@@ -47,7 +48,7 @@ elif model == "TBmix":
         tbmix_result = loader.load_tbmix_sigma_results()
     else:
         raise Exception("Invalid plot variable name")
-    coords, arr = tbmix_result[:, :2], tbmix_result[:, 2:]
+    coords, arr = tbmix_result[:, :num_coords], tbmix_result[:, num_coords:]
 
 else:
     raise Exception("Invalid model name")
