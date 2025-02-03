@@ -16,7 +16,7 @@ class ResultsLoader:
         self.dataset = locals_dict['dataset']
         self.case = locals_dict['case']
         self.plot_var_name = locals_dict['plot_var_name']
-        self.num_coords = locals_dict['num_coords']
+        self.num_dims = locals_dict['num_dims']
         self.path = None
 
     def declare_ml_results_path(self):
@@ -76,11 +76,11 @@ class ResultsLoader:
     def extract_coords(self, result):
         # Extract Cx and Cy coordinates
         start_row, end_row = self.calc_start_end()
-        return result[start_row:end_row, :self.num_coords]
+        return result[start_row:end_row, :self.num_dims]
 
     def extract_rans_bij(self, rans_result):
         start_row, end_row = self.calc_start_end()
-        return rans_result[start_row:end_row, self.num_coords:self.num_coords+9]
+        return rans_result[start_row:end_row, self.num_dims:self.num_dims+9]
 
     def extract_true_bij(self, true_result):
         start_row, end_row = self.calc_start_end()

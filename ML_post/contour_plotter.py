@@ -35,7 +35,7 @@ elif model == "TBNN":
     # Load TBNN coordinates and bij array
     loader.declare_ml_results_path()
     tbnn_result = loader.load_tbnn_results()
-    coords, arr = tbnn_result[:, :num_coords], tbnn_result[:, num_coords:]
+    coords, arr = tbnn_result[:, :num_dims], tbnn_result[:, num_dims:]
 
 elif model == "TBmix":
     # Load TBmix coordinates and array of variable for plotting
@@ -48,7 +48,7 @@ elif model == "TBmix":
         tbmix_result = loader.load_tbmix_sigma_results()
     else:
         raise Exception("Invalid plot variable name")
-    coords, arr = tbmix_result[:, :num_coords], tbmix_result[:, num_coords:]
+    coords, arr = tbmix_result[:, :num_dims], tbmix_result[:, num_dims:]
 
 else:
     raise Exception("Invalid model name")
