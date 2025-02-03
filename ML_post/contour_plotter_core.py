@@ -57,6 +57,17 @@ class ResultsLoader:
             case_list, num_rows = [1800, 3600, 4500, 5400, 7200], 80296
         elif self.dataset == "PHLL4":
             case_list, num_rows = ["_0p5", "_1p0", "_1p2", "_1p5"], 14751
+        elif self.dataset == "MVEN6":
+            case_list = ["_0p5", "_1p0", "_1p2", "_1p5", "3500", "3600"]
+            num_rows = [14751, 14751, 14751, 14751, 9216, 80296]
+            start_row = 0
+            for i in range(len(case_list)):
+                end_row = start_row + num_rows[i]
+                if self.case[-4:] == case_list[i]:
+                    return start_row, end_row
+                else:
+                    start_row = end_row
+            raise Exception("Case not found in case_list")
         else:
             raise Exception("Dataset not supported in this method")
         idx = case_list.index(self.case[-4:])
@@ -101,7 +112,7 @@ class ContourPlotter:
         if "PHLL" in self.case:
             x_grid, y_grid, z_grid = \
                 zdp.create_sorted_contourf_grids("non_zonal", plot_var, self.case)
-        elif "FBFS" in self.case:
+        elif "FBFS" or "DUCT" in self.case:
             x_grid, y_grid, z_grid = \
                 zdp.create_allocated_contourf_grids("non_zonal", plot_var, self.case)
         else:

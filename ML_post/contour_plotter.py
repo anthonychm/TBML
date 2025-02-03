@@ -54,6 +54,14 @@ else:
     raise Exception("Invalid model name")
 
 # Initialise contour plotter and plot contour
+if "PHLL" in case:
+    coords = coords[:, :2]
+elif "FBFS" in case:
+    coords = coords[:, :2]
+    coords[:, 0] = (coords[:, 0] + 0.063) / 0.018
+    coords[:, 1] = (coords[:, 1] + 0.003) / 0.018
+elif "DUCT" in case:
+    coords = coords[:, -2:]
 plotter = cpc.ContourPlotter(case, plot_var_name, coords)
 plotter.create_non_zonal_database()
 if plot_var_name[0] == "b":
