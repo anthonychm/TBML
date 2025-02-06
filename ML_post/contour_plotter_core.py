@@ -87,6 +87,17 @@ class ResultsLoader:
         true_tauij = true_result[start_row:end_row, -9:]
         return PopeDataProcessor.calc_true_output(true_tauij, output_var="bij")
 
+    def three_dim_to_two_dim(self, coords):
+        if "PHLL" in self.case:
+            return coords[:, :2]
+        elif "FBFS" in self.case:
+            coords = coords[:, :2]
+            coords[:, 0] = (coords[:, 0] + 0.063) / 0.018
+            coords[:, 1] = (coords[:, 1] + 0.003) / 0.018
+            return coords
+        elif "DUCT" in self.case:
+            return coords[:, -2:]
+
 
 class ContourPlotter:
     def __init__(self, case, plot_var_name, coords):
