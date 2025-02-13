@@ -282,6 +282,8 @@ class ZonalDataPlotter:
         # Specify number of discretizations in x and y directions
         if "FBFS" in case:
             nx, ny = 870, 100
+        elif "DUCT" in case:
+            nx, ny = 96, 96
         else:
             raise Exception("Not a valid case")
 
