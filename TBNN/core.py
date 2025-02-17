@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.utils.data as torchdata
 import pandas as pd
 from calculator import PopeDataProcessor
+import core_plotter
 
 
 class DataLoader:
@@ -301,11 +302,10 @@ class TbnnTVT:
             # Update learning rate
             self.lr_scheduler.step()
 
-        # Output final training and validation RMSEs per data point ✓
-        final_train_rmse = np.sqrt(avg_train_loss)
-        final_valid_rmse = np.sqrt(avg_valid_loss)
-        self.post_train_print(self.log, epoch_count, final_train_rmse,
-                              final_valid_rmse)  # ✓
+        # Output final training and validation losses ✓
+        self.post_train_print(self.log, epoch_count, avg_train_loss, avg_valid_loss)  # ✓
+        core_plotter.plot_loss_curves(epoch_count, train_loss_list, valid_loss_list,
+                                      self.interval)
 
         return epoch_count, final_train_rmse, final_valid_rmse
 
