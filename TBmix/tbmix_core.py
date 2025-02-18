@@ -171,8 +171,7 @@ class TBMix(nn.Module):
                     mu_bij = mu_bij + (mu_g01[data_point, k]*t01) + \
                              (mu_g02[data_point, k]*t02) + (mu_g03[data_point, k]*t03)
 
-                # mu_bij_batch[k, data_point, :] = mu_bij
-                mu_bij_batch[k, data_point, :] = torch.tanh(mu_bij)
+                mu_bij_batch[k, data_point, :] = mu_bij
 
         # Multiply std by number of terms in calculating bij, each with std = sigma
         sigma = self.structure.num_tensor_basis*sigma
