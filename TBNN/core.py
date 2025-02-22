@@ -262,6 +262,7 @@ class TbnnTVT:
 
     def fit(self, device, train_loader, valid_loader, model):  # ✓
         epoch_count = 0
+        train_loss_list = []
         valid_loss_list = []
         continue_train = True
 
@@ -271,6 +272,7 @@ class TbnnTVT:
             model.train()
             avg_train_loss = self.train_one_epoch(train_loader, self.criterion,
                                                   self.optimizer, device, model)  # ✓
+            train_loss_list.append(avg_train_loss)
 
             # Print average training rmse per data point per bij comp
             if epoch_count % self.print_freq == 0:
