@@ -274,10 +274,10 @@ class TbnnTVT:
                                                   self.optimizer, device, model)  # ✓
             train_loss_list.append(avg_train_loss)
 
-            # Print average training rmse per data point per bij comp
+            # Print average training loss per batch
             if epoch_count % self.print_freq == 0:
-                print(f"Epoch = {epoch_count}, Average training rmse per data point per "
-                      f"bij component = {np.sqrt(avg_train_loss)}")
+                print(f"Epoch = {epoch_count}, "
+                      f"Average training loss per batch = {avg_train_loss}")
 
             # Predict on validation data for early stopping ✓
             if epoch_count % self.interval == 0:
@@ -287,10 +287,10 @@ class TbnnTVT:
                 continue_train = self.check_conv(valid_loss_list, self.min_epochs,
                                                  self.avg_interval, epoch_count)  # ✓
 
-                # Print average validation rmse per data point per bij comp
+                # Print average validation loss per batch
                 print("------------------------------------------------------------")
-                print(f"Epoch = {epoch_count}, Average validation rmse per data point "
-                      f"per bij component = {np.sqrt(avg_valid_loss)}")
+                print(f"Epoch = {epoch_count}, "
+                      f"Average validation loss per batch = {avg_valid_loss}")
                 print("------------------------------------------------------------")
 
                 if continue_train is False:
@@ -330,7 +330,7 @@ class TbnnTVT:
             # Record loss
             running_train_loss += loss.item()  # Sum of MSE for all batches
 
-        # Calculate average loss per data point per bij comp
+        # Calculate average loss per batch
         avg_train_loss = running_train_loss / len(train_loader)
 
         return avg_train_loss
@@ -346,7 +346,7 @@ class TbnnTVT:
                 valid_loss = criterion(valid_outputs, y)
                 running_valid_loss += valid_loss.item()
 
-        # Calculate average loss per data point per bij comp
+        # Calculate average loss per batch
         avg_valid_loss = running_valid_loss / len(valid_loader)
 
         return avg_valid_loss
