@@ -7,7 +7,8 @@ def get_metadata(dataset_name):
                 "CHAN7_with_interps_half_dataset.txt": half_chan7_with_interps(),
                 "CHAN7_no_oti_with_interps_half_dataset.txt":
                     half_chan7_no_oti_with_interps(),
-                "MVEN6_dataset.txt": mven6()}
+                "MVEN6_dataset.txt": mven6(),
+                "DUCT16_dataset.txt": duct16()}
     return ref_dict[dataset_name]
 
 
@@ -71,5 +72,14 @@ def mven6():
     keys = [0.5, 1.0, 1.2, 1.5, 3500, 3600]
     num_points = [14751, 14751, 14751, 14751, 9216, 80296]
     case_dict = dict(zip(keys, num_points))
+    num_skip_rows = 1
+    return case_dict, num_points, num_skip_rows
+
+
+def duct16():
+    keys = [1100, 1150, 1250, 1300, 1350, 1400, 1500, 1600, 1800, 2000, 2205, 2400,
+            2600, 2900, 3200, 3500]
+    num_points = 9216
+    case_dict = dict.fromkeys(keys, num_points)
     num_skip_rows = 1
     return case_dict, num_points, num_skip_rows

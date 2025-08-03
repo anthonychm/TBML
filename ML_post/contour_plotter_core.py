@@ -57,6 +57,10 @@ class ResultsLoader:
             case_list, num_rows = [1800, 3600, 4500, 5400, 7200], 80296
         elif self.dataset == "PHLL4":
             case_list, num_rows = ["_0p5", "_1p0", "_1p2", "_1p5"], 14751
+        elif self.dataset == "DUCT16":
+            case_list, num_rows = ["1100", "1150", "1250", "1300", "1350", "1400", "1500",
+                                   "1600", "1800", "2000", "2205", "2400", "2600", "2900",
+                                   "3200", "3500"], 9216
         elif self.dataset == "MVEN6":
             case_list = ["_0p5", "_1p0", "_1p2", "_1p5", "3500", "3600"]
             num_rows = [14751, 14751, 14751, 14751, 9216, 80296]
