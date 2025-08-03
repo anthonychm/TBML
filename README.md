@@ -51,7 +51,7 @@ The TBMix is a modified version of TBNN with mixture density outputs to give pro
 ## Framework Mapping Analyser
 A mapping analyser tool based on unsupervised clustering was developed to assess the relationship (i.e., mapping) between the inputs and outputs of these models. With this tool, it was shown for the first time that non-unique mapping can occur between the conventional scalar invariant inputs and anisotropy components in TBNN for two-dimensional flows (Man *et al.*, 2024). This tool can be used for any type and number of inputs for the frameworks in this package. Users should run `Driver/mapping_analyser.py` to evaluate the input-output relationship of their chosen framework.
 
-Man, A., Jadidi, M., Keshmiri, A., Yin, H. & Mahmoudi, Y. (2024) Non-unique machine learning mapping in data-driven Reynolds averaged turbulence models. *Physics of Fluids* **36**, accepted/in press.
+Man, A., Jadidi, M., Keshmiri, A., Yin, H. & Mahmoudi, Y. (2024) Non-unique machine learning mapping in data-driven Reynolds-averaged turbulence models. *Physics of Fluids* **36**, 095119. https://doi.org/10.1063/5.0220444
 
 Preprint: https://arxiv.org/abs/2312.13005
 
